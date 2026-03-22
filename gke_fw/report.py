@@ -58,7 +58,6 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     p(f"| Metric | Count |")
     p(f"|--------|-------|")
     p(f"| Projects scanned | {total_projects} ({shared_vpc_count} shared VPC, {standalone_count} standalone) |")
-    p(f"| External LoadBalancers found | {len(all_lbs)} |")
     p(f"| Firewall rules requiring action | {len(actionable)} |")
     p(f"| Projects with issues | {projects_with_issues} |")
     p()
@@ -217,7 +216,7 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if not all_lbs and not actionable:
         result_banner = '<div class="result-banner result-clean">No impact detected. No action required.</div>'
     else:
-        result_banner = f'<div class="result-banner result-action">{len(actionable)} firewall rule(s) require action across {projects_with_issues} project(s)</div>'
+        result_banner = ""
 
     # External LBs table — no Region column
     if all_lbs:
@@ -443,7 +442,6 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
 
   <div class="cards">
     <div class="card"><div class="value">{total_projects}</div><div class="label">Projects Scanned<br><small>{shared_vpc_count} shared VPC, {standalone_count} standalone</small></div></div>
-    <div class="card {lb_card_class}"><div class="value">{total_lbs}</div><div class="label">External LoadBalancers</div></div>
     <div class="card {rules_card_class}"><div class="value">{total_actionable}</div><div class="label">Rules Requiring Action</div></div>
     <div class="card {issues_card_class}"><div class="value">{projects_with_issues}</div><div class="label">Projects with Issues</div></div>
   </div>

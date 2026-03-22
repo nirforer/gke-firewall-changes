@@ -1,17 +1,26 @@
 # GKE 1.35.1 Firewall Change Discovery
 
-Scans your GCP projects to assess the impact of the GKE 1.35.1 firewall rule change (GCP ref: 493570689) for External LoadBalancer Services.
+Google sent an email (ref: 493570689) notifying customers about an upcoming change to how GKE manages firewall rules for External LoadBalancer Services. This tool helps you figure out if that change affects you.
 
-**What's changing:** In GKE 1.35.1-gke.1473000, the GKE-managed ALLOW rule for External LB Service ports moves from priority 1000 to 999, and a new DENY rule is added at priority 1000 blocking all other traffic to the LB IP(s).
+## What does this tool do?
 
-**What it checks:**
-- External LoadBalancer Services across all GKE clusters
-- Custom firewall rules at priority 999 and 1000 that may conflict
-- Exact GKE node pool tag matching (with fallback heuristic)
-- Shared VPC and standalone project configurations
-- Firewall quota headroom
+1. **Finds your External LoadBalancers** — scans your GKE clusters for Services of type LoadBalancer with external IPs. These are the services that the GKE change applies to.
 
-**Output:** An interactive HTML report with sortable tables, severity badges, and remediation steps.
+2. **Checks your custom firewall rules** — looks at your VPC firewall rules at priority 999 and 1000 to see if any of them will break or be bypassed after the change.
+
+3. **Matches rules to GKE nodes** — reads the actual network tags from your GKE node pools and checks if your custom firewall rules target those nodes. If a rule doesn't target GKE nodes, it won't be affected.
+
+4. **Generates a report** — produces an HTML report showing exactly which rules need action, which are fine, and what to do about it.
+
+## How does it know if you're affected?
+
+The GKE change moves a firewall rule from priority 1000 to 999 and adds a new DENY rule at 1000. This tool checks two things:
+
+- **Do you have custom ALLOW rules at priority 1000 that target GKE nodes?** If yes, the new DENY rule at the same priority could block traffic you need. You'd need to move those rules to a higher priority (lower number).
+
+- **Do you have custom DENY rules at priority 1000?** If yes, the new GKE ALLOW at priority 999 will take precedence over your DENY, potentially allowing traffic you intended to block. You'd need to move those DENY rules to priority 999 or lower.
+
+If you don't have any custom firewall rules at those priorities, or your rules don't target GKE nodes, you're not affected.
 
 ## Quick Start (Cloud Shell)
 
@@ -84,35 +93,3 @@ python3 gke_firewall_discovery.py --host-project=my-project --output=report.md
 | Service/GKE projects | `roles/compute.viewer` | List forwarding rules |
 | Service/GKE projects | `roles/container.viewer` | List GKE clusters and node pool tags |
 | Org/Folder (optional) | `roles/resourcemanager.folderViewer` | Auto-discover projects |
-
-## What the Script Detects
-
-### Scenario A — Custom ALLOW rules at priority 1000
-
-The new GKE-managed DENY rule at priority 1000 will block traffic to External LB IPs on non-service ports. Custom ALLOW rules at the same priority may be overridden, blocking traffic they previously permitted.
-
-**Fix:** Move affected ALLOW rules to priority 998.
-
-### Scenario B — Custom DENY rules at priority 1000
-
-The GKE-managed ALLOW rule moves from priority 1000 to 999. Custom DENY rules at priority 1000 (e.g. geo-blocking) will be bypassed since 999 takes precedence over 1000.
-
-**Fix:** Move affected DENY rules to priority 999 (DENY wins over ALLOW at the same priority) or lower.
-
-## Architecture
-
-```
-Scan Phase (parallel per service project)
-├── External LB detection (forwarding rules API)
-├── GKE cluster inventory + node pool tag extraction
-└── Results collected before firewall analysis
-
-Analysis Phase (per host/network project)
-├── Firewall rules analysis (priority 999, 1000)
-├── Exact node tag matching against discovered GKE node pools
-│   └── Fallback to "gke-" prefix heuristic if tags unavailable
-└── Quota check
-
-Report Phase
-└── Consolidated HTML/MD report with all findings
-```
