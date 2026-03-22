@@ -22,11 +22,15 @@ To close this gap, GKE 1.35.1 adds a DENY rule at priority 1000 that blocks all 
 
 ## How does it know if you're affected?
 
-This tool checks two things:
+The tool scans your firewall rules and checks:
 
-- **Do you have custom ALLOW rules at priority 1000 that target GKE nodes?** If yes, the new DENY rule at the same priority could block traffic you need. You'd need to move those rules to a higher priority (lower number).
+- **Custom ALLOW rules at priority 1000 that target GKE nodes** — the new DENY rule at the same priority could block traffic you need. You'd need to move those rules to a higher priority (lower number).
 
-- **Do you have custom DENY rules at priority 1000?** If yes, the new GKE ALLOW at priority 999 will take precedence over your DENY, potentially allowing traffic you intended to block. You'd need to move those DENY rules to priority 999 or lower.
+- **Custom DENY rules at priority 1000** — the new GKE ALLOW at priority 999 will take precedence over your DENY, potentially allowing traffic you intended to block. You'd need to move those DENY rules to priority 999 or lower.
+
+- **Custom rules at priority 999** — listed for awareness since the new GKE ALLOW also sits at 999, though these are not affected.
+
+- **Firewall rule quota** — the change adds up to 2 new rules per External LB. The tool warns if your project would exceed its quota.
 
 If you don't have any custom firewall rules at those priorities, or your rules don't target GKE nodes, you're not affected.
 
