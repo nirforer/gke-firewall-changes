@@ -36,6 +36,10 @@ bash run.sh
 
 The interactive wizard will prompt you for the scan scope, generate an HTML report, and serve it via Web Preview.
 
+**To view the report:** once the scan finishes, click **Web Preview** (the icon to the right of the blue terminal button in the top-right corner of Cloud Shell) and select **Preview on port 8080**.
+
+![Web Preview button location](https://github.com/nirforer/gke-firewall-changes/raw/main/docs/web-preview.png)
+
 ## Manual Usage
 
 ### Setup
