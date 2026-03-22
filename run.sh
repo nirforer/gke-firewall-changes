@@ -180,8 +180,7 @@ case "$SCOPE" in
       read -p "Folder ID: " FOLDER_ID
     fi
 
-    LIMIT=$(pick_one "Max projects to scan:" "50" "100" "200" "500")
-    EXTRA_FLAGS="--folder=${FOLDER_ID} --limit=${LIMIT}"
+    EXTRA_FLAGS="--folder=${FOLDER_ID} --limit=10000"
     ;;
 
   Organization*)
@@ -196,8 +195,7 @@ case "$SCOPE" in
       read -p "Organization ID: " ORG_ID
     fi
 
-    LIMIT=$(pick_one "Max projects to scan:" "50" "100" "200" "500")
-    EXTRA_FLAGS="--org=${ORG_ID} --limit=${LIMIT}"
+    EXTRA_FLAGS="--org=${ORG_ID} --limit=10000"
     ;;
 
   Custom*)
