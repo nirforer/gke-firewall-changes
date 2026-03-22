@@ -54,10 +54,11 @@ def _scan_service_project(project_id: str) -> tuple[list[ExternalLB], set[str]]:
 
 def _has_gke_node_tag(rule_tags: list[str], known_node_tags: set[str]) -> bool:
     """Check if a firewall rule targets GKE nodes by matching its target
-    tags against known node pool tags. Falls back to the 'gke-' prefix
-    heuristic if no node tags were discovered (e.g. permission denied)."""
-    if known_node_tags:
-        return bool(set(rule_tags) & known_node_tags)
+    tags against known node pool tags. Also checks the 'gke-' prefix
+    since GKE auto-generated tags always follow this pattern but may
+    not appear in NodeConfig.tags (only custom tags are listed there)."""
+    if known_node_tags and set(rule_tags) & known_node_tags:
+        return True
     return any("gke-" in t for t in rule_tags)
 
 
@@ -162,15 +163,8 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 action="Move to P998.",
             ))
         elif r.is_allow:
-            if all_node_tags:
-                # We have real node tags — this rule doesn't target GKE nodes
-                detail = "does not target GKE nodes"
-                action = "No action needed."
-            else:
-                # No node tags discovered (GKE API permission denied?) —
-                # can't confirm whether these tags match GKE nodes or not
-                detail = "could not verify against GKE node tags"
-                action = "Verify manually — GKE node tags could not be read."
+            # Tags don't match any known GKE node tags and don't contain
+            # the "gke-" prefix — this rule doesn't target GKE nodes
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Scenario A", rule_name=r.name,
@@ -178,8 +172,8 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 rule_action="ALLOW", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
                 target_tags=",".join(r.target_tags),
-                detail=detail,
-                action=action,
+                detail="does not target GKE nodes",
+                action="No action needed.",
             ))
         elif r.is_deny and r.has_no_tags:
             # Scenario B — HIGH: applies to all instances including GKE nodes,
@@ -208,12 +202,6 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
         elif r.is_deny:
             # Scenario B — INFO: DENY with non-GKE tags, doesn't target
             # GKE nodes so the new GKE ALLOW at P999 won't bypass it
-            if all_node_tags:
-                detail = "does not target GKE nodes"
-                action = "No action needed."
-            else:
-                detail = "could not verify against GKE node tags"
-                action = "Verify manually — GKE node tags could not be read."
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Scenario B", rule_name=r.name,
@@ -221,8 +209,8 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 rule_action="DENY", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
                 target_tags=",".join(r.target_tags),
-                detail=detail,
-                action=action,
+                detail="does not target GKE nodes",
+                action="No action needed.",
             ))
 
     result.quota_usage, result.quota_limit = get_project_quota(hp)
