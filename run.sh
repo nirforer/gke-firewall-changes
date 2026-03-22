@@ -133,10 +133,10 @@ fi
 # Step 1: Pick scan scope
 echo ""
 SCOPE=$(pick_one "How would you like to scan?" \
-  "Project (fastest — scan a single project)" \
-  "Host project (shared VPC — auto-discovers service projects)" \
-  "Folder (scan all projects in a folder)" \
   "Organization (scan all projects in an org)" \
+  "Folder (scan all projects in a folder)" \
+  "Project (scan a single project)" \
+  "Host project (shared VPC — auto-discovers service projects)" \
   "Custom flags")
 
 EXTRA_FLAGS=""
