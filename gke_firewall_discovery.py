@@ -162,6 +162,7 @@ def main():
         status(f"  In Cloud Shell: click 'Web Preview' → 'Preview on port {port}'")
         status(f"  Press Ctrl+C to stop.\n")
 
+        socketserver.TCPServer.allow_reuse_address = True
         with socketserver.TCPServer(("", port), Handler) as httpd:
             try:
                 httpd.serve_forever()
