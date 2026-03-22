@@ -149,8 +149,6 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p()
         p("**Notes:**")
         p("- Test in staging before modifying production rules")
-        p("- Rules with internal-only source ranges (10.x, 172.x, 192.168.x) are lower risk")
-        p("- The new GKE DENY only targets External LB IPs — other traffic is unaffected")
 
     all_errors = [e for r in results for e in r.errors]
     if all_errors:
@@ -308,8 +306,6 @@ gcloud compute firewall-rules delete $RULE --project=$PROJECT</code></pre>
         <div class="note">
           <strong>Notes:</strong><br>
           &bull; Test in staging before modifying production rules<br>
-          &bull; Rules with internal-only source ranges (10.x, 172.x, 192.168.x) are lower risk<br>
-          &bull; The new GKE DENY only targets External LB IPs &mdash; other traffic is unaffected<br>
           &bull; For Scenario B, DENY at P999 works because DENY wins over ALLOW at the same priority
         </div>"""
     else:
