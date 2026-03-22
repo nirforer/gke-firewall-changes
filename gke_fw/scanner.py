@@ -57,6 +57,9 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                     result.conflicting_rules.append(Finding(
                         project=hp, vpc_type=vpc_type, severity="INFO",
                         category="External LB FW Rule", rule_name=r.name,
+                        priority=r.priority, direction=r.direction,
+                        rule_action="ALLOW", protocols=r.action_str,
+                        source_ranges=",".join(r.source_ranges),
                         detail=f"GKE-managed rule for External LB IP {svc_ip}",
                         action="Will be automatically updated by GKE 1.35.1",
                     ))
@@ -71,7 +74,10 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="MEDIUM",
                 category="Custom P999", rule_name=r.name,
-                detail=f"{r.rule_type} {r.action_str} (src: {','.join(r.source_ranges)[:40]})",
+                priority=r.priority, direction=r.direction,
+                rule_action=r.rule_type, protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags),
                 action="Review — new GKE ALLOW also at P999.",
             ))
 
@@ -89,7 +95,10 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="HIGH",
                 category="Scenario A", rule_name=r.name,
-                detail=f"ALLOW {r.action_str} from {','.join(r.source_ranges)[:40]} — NO target tags",
+                priority=r.priority, direction=r.direction,
+                rule_action="ALLOW", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags="(none)",
                 action="Move to P998.",
             ))
         elif r.is_allow and r.has_gke_tags:
@@ -97,7 +106,10 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="MEDIUM",
                 category="Scenario A", rule_name=r.name,
-                detail=f"ALLOW {r.action_str} tags: {','.join(r.target_tags)[:40]}",
+                priority=r.priority, direction=r.direction,
+                rule_action="ALLOW", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags),
                 action="Move to P998.",
             ))
         elif r.is_allow:
@@ -106,7 +118,11 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Scenario A", rule_name=r.name,
-                detail=f"ALLOW {r.action_str} tags: {','.join(r.target_tags)[:40]} (non-GKE)",
+                priority=r.priority, direction=r.direction,
+                rule_action="ALLOW", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags),
+                detail="non-GKE tags",
                 action="Review if tags overlap with GKE node targets.",
             ))
         elif r.is_deny:
@@ -114,7 +130,10 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="HIGH",
                 category="Scenario B", rule_name=r.name,
-                detail=f"DENY {r.action_str} from {','.join(r.source_ranges)[:40]}",
+                priority=r.priority, direction=r.direction,
+                rule_action="DENY", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags) or "(none)",
                 action="Move to P999 or lower.",
             ))
 

@@ -66,8 +66,14 @@ class Finding:
     severity: str
     category: str
     rule_name: str
-    detail: str
     action: str
+    priority: int = 0
+    direction: str = ""
+    rule_action: str = ""  # ALLOW or DENY
+    protocols: str = ""
+    source_ranges: str = ""
+    target_tags: str = ""
+    detail: str = ""  # free-form note (used for INFO findings)
 
 
 @dataclass

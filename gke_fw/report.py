@@ -60,10 +60,10 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
 
     if all_lbs:
         p(f"## External LoadBalancers\n")
-        p(f"| Project | LB IP | Ports | Region | Cluster | Version |")
-        p(f"|---------|-------|-------|--------|---------|---------|")
+        p(f"| Project | LB IP | Ports | Cluster | Version |")
+        p(f"|---------|-------|-------|---------|---------|")
         for lb in all_lbs:
-            p(f"| {lb.project} | {lb.ip} | {lb.ports} | {lb.region} | {lb.cluster or '-'} | {lb.cluster_version or '-'} |")
+            p(f"| {lb.project} | {lb.ip} | {lb.ports} | {lb.cluster or '-'} | {lb.cluster_version or '-'} |")
         p()
 
     if actionable:
@@ -73,29 +73,29 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         scenario_a = [f for f in actionable if f.category == "Scenario A"]
         if scenario_a:
             p(f"### Scenario A — Custom ALLOW rules at P1000 (will be overridden by new GKE DENY)\n")
-            p(f"| Priority | Project | Rule | Detail | Tags |")
-            p(f"|----------|---------|------|--------|------|")
+            p(f"| Severity | Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
+            p(f"|----------|---------|------|----------|--------|-----------|---------------|-------------|")
             for f in sorted(scenario_a, key=lambda x: x.severity):
-                p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.detail} | {'no tags' if 'NO target' in f.detail else 'GKE tags'} |")
+                p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
             p()
 
         scenario_b = [f for f in actionable if f.category == "Scenario B"]
         if scenario_b:
             p(f"### Scenario B — Custom DENY rules at P1000 (will be bypassed by new GKE ALLOW at P999)\n")
             p(f"Move to P999 (DENY wins over ALLOW at same priority) or lower.\n")
-            p(f"| Priority | Project | Rule | Detail |")
-            p(f"|----------|---------|------|--------|")
+            p(f"| Severity | Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
+            p(f"|----------|---------|------|----------|--------|-----------|---------------|-------------|")
             for f in sorted(scenario_b, key=lambda x: x.severity):
-                p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.detail} |")
+                p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
             p()
 
     p999_findings = [f for f in all_findings if f.category == "Custom P999"]
     if p999_findings:
         p(f"### Custom Rules at Priority 999 (review recommended)\n")
-        p(f"| Project | Rule | Detail |")
-        p(f"|---------|------|--------|")
+        p(f"| Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
+        p(f"|---------|------|----------|--------|-----------|---------------|-------------|")
         for f in p999_findings:
-            p(f"| {f.project} | `{f.rule_name}` | {f.detail} |")
+            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
         p()
 
     # INFO findings for awareness
@@ -104,10 +104,10 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p(f"### Low Risk — Custom ALLOW rules at P1000 with non-GKE tags\n")
         p(f"These rules have target tags that don't match GKE nodes. Unlikely to be affected,")
         p(f"but review if any tags overlap with GKE node targets.\n")
-        p(f"| Project | Rule | Detail |")
-        p(f"|---------|------|--------|")
+        p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags |")
+        p(f"|---------|------|----------|-----------|---------------|-------------|")
         for f in info_findings:
-            p(f"| {f.project} | `{f.rule_name}` | {f.detail} |")
+            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
         p()
 
     p(f"## Per-Project Summary\n")
@@ -183,16 +183,16 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     else:
         result_banner = f'<div class="result-banner result-action">{len(actionable)} firewall rule(s) require action across {projects_with_issues} project(s)</div>'
 
-    # External LBs table
+    # External LBs table — no Region column
     if all_lbs:
         rows = ""
         for lb in all_lbs:
-            rows += f"<tr><td>{lb.project}</td><td><code>{lb.ip}</code></td><td>{lb.ports}</td><td>{lb.region}</td><td>{lb.cluster or '-'}</td><td>{lb.cluster_version or '-'}</td></tr>\n"
+            rows += f"<tr><td>{lb.project}</td><td><code>{lb.ip}</code></td><td>{lb.ports}</td><td>{lb.cluster or '-'}</td><td>{lb.cluster_version or '-'}</td></tr>\n"
         external_lbs_section = f"""
         <h2>External LoadBalancers</h2>
         <div class="filter-bar"><input type="text" placeholder="Filter..."></div>
         <table>
-          <thead><tr><th data-sort>Project <span class="sort-arrow">↕</span></th><th data-sort>LB IP</th><th data-sort>Ports</th><th data-sort>Region</th><th data-sort>Cluster</th><th data-sort>Version</th></tr></thead>
+          <thead><tr><th data-sort>Project <span class="sort-arrow">↕</span></th><th data-sort>LB IP</th><th data-sort>Ports</th><th data-sort>Cluster</th><th data-sort>Version</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>"""
     else:
@@ -203,13 +203,12 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if scenario_a:
         rows = ""
         for f in sorted(scenario_a, key=lambda x: x.severity):
-            tags = "no tags" if "NO target" in f.detail else "GKE tags"
-            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.detail}</td><td>{tags}</td></tr>\n"
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
         scenario_a_section = f"""
         <h2>Scenario A — Custom ALLOW Rules at P1000</h2>
         <p>These will be <strong>overridden</strong> by the new GKE DENY rule at P1000. Move to P998.</p>
         <table>
-          <thead><tr><th data-sort>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th>Detail</th><th data-sort>Tags</th></tr></thead>
+          <thead><tr><th data-sort>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>"""
     else:
@@ -220,12 +219,12 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if info_a:
         rows = ""
         for f in info_a:
-            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.detail}</td></tr>\n"
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
         scenario_a_section += f"""
         <details><summary>Low Risk — ALLOW at P1000 with non-GKE tags ({len(info_a)} rule(s))</summary>
         <p>These rules have target tags that don't match GKE nodes. Review if any tags overlap with GKE node targets.</p>
         <table>
-          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th>Detail</th></tr></thead>
+          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
           <tbody>{rows}</tbody>
         </table></details>"""
 
@@ -234,12 +233,12 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if scenario_b:
         rows = ""
         for f in sorted(scenario_b, key=lambda x: x.severity):
-            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.detail}</td></tr>\n"
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
         scenario_b_section = f"""
         <h2>Scenario B — Custom DENY Rules at P1000</h2>
         <p>These will be <strong>bypassed</strong> by the new GKE ALLOW rule at P999. Move to P999 (DENY wins over ALLOW at same priority) or lower.</p>
         <table>
-          <thead><tr><th data-sort>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th>Detail</th></tr></thead>
+          <thead><tr><th data-sort>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>"""
     else:
@@ -250,11 +249,11 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if p999:
         rows = ""
         for f in p999:
-            rows += f"<tr><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.detail}</td></tr>\n"
+            rows += f"<tr><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
         p999_section = f"""
         <details><summary>Custom Rules at Priority 999 ({len(p999)} rule(s) — review recommended)</summary>
         <table>
-          <thead><tr><th data-sort>Project</th><th data-sort>Rule</th><th>Detail</th></tr></thead>
+          <thead><tr><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
           <tbody>{rows}</tbody>
         </table></details>"""
     else:
