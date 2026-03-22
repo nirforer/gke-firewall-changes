@@ -14,9 +14,15 @@ Google sent an email (ref: 493570689) notifying customers about an upcoming chan
 
 4. **Generates a report** — produces an HTML report showing exactly which rules need action, which are fine, and what to do about it.
 
+## Why is Google making this change?
+
+The cloud infrastructure behind a GKE External LoadBalancer may forward a broader range of ports to your nodes than what's defined in the Kubernetes Service manifest. If you also have a broad custom ALLOW firewall rule (e.g. allow all TCP at priority 1000), services running on those extra ports could be unintentionally exposed to the internet.
+
+To close this gap, GKE 1.35.1 adds a DENY rule at priority 1000 that blocks all traffic to the LB IP(s) except the specific ports in your Service manifest (allowed by a new ALLOW rule at priority 999).
+
 ## How does it know if you're affected?
 
-The GKE change moves a firewall rule from priority 1000 to 999 and adds a new DENY rule at 1000. This tool checks two things:
+This tool checks two things:
 
 - **Do you have custom ALLOW rules at priority 1000 that target GKE nodes?** If yes, the new DENY rule at the same priority could block traffic you need. You'd need to move those rules to a higher priority (lower number).
 
