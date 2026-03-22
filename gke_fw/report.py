@@ -43,12 +43,20 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     p(f"{'=' * 70}")
     p()
     p(f"## What is changing (GCP Ref: 493570689)\n")
-    p(f"In GKE 1.35.1-gke.1473000, GKE-managed ALLOW rules for External LB Services")
-    p(f"move from P1000 to P999, and a new DENY rule is added at P1000 blocking all")
-    p(f"other traffic to the LB IP(s).")
+    p(f"**Why:** The cloud infrastructure behind a GKE External LoadBalancer may forward a broader")
+    p(f"range of ports to your nodes than what's defined in the Kubernetes Service manifest. If you")
+    p(f"also have a broad custom ALLOW firewall rule (e.g. allow all TCP at priority 1000), services")
+    p(f"running on those extra ports could be unintentionally exposed to the internet.")
     p()
-    p(f"- **Scenario A**: Custom ALLOW at P1000 may be overridden by the new GKE DENY at P1000.")
-    p(f"- **Scenario B**: Custom DENY at P1000 will be bypassed by the new GKE ALLOW at P999.")
+    p(f"**What's changing:** In GKE 1.35.1-gke.1473000, GKE adds a DENY rule at priority 1000 that")
+    p(f"blocks all traffic to the LB IP(s) except the specific ports in your Service manifest (allowed")
+    p(f"by a new ALLOW rule at priority 999). This closes the exposure gap by default.")
+    p()
+    p(f"**Why this might break things:**")
+    p(f"- **Scenario A**: If you have custom ALLOW rules at P1000 that permit traffic to GKE nodes,")
+    p(f"  the new DENY at the same priority will override them — blocking traffic you currently allow.")
+    p(f"- **Scenario B**: If you have custom DENY rules at P1000 (e.g. geo-blocking), the new ALLOW")
+    p(f"  at P999 takes precedence — bypassing your block.")
     p()
     p(f"**Severity levels:**")
     p(f"- **HIGH** — Rule will be directly affected. Action required before GKE 1.35.1 rollout.")
@@ -476,13 +484,13 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
   <details open>
     <summary>What is changing (GCP Reference: 493570689)</summary>
     <div class="note" style="margin-top: 0.5rem;">
-      <p>In <strong>GKE 1.35.1-gke.1473000</strong>, Google is changing how firewall rules are managed for External LoadBalancer Services:</p>
-      <ul style="margin: 0.8rem 0 0.8rem 1.5rem;">
-        <li>The existing GKE-managed <strong>ALLOW</strong> rule for LoadBalancer Service ports will be changed from <strong>priority 1000 to priority 999</strong>.</li>
-        <li>A new GKE-managed <strong>DENY</strong> rule will be introduced at <strong>priority 1000</strong>, blocking all other traffic to the LoadBalancer IP(s).</li>
+      <p><strong>Why:</strong> The cloud infrastructure behind a GKE External LoadBalancer may forward a broader range of ports to your nodes than what's defined in the Kubernetes Service manifest. If you also have a broad custom ALLOW firewall rule (e.g. allow all TCP at priority 1000), services running on those extra ports could be unintentionally exposed to the internet.</p>
+      <p style="margin-top: 0.8rem;"><strong>What's changing:</strong> In <strong>GKE 1.35.1-gke.1473000</strong>, GKE adds a DENY rule at priority 1000 that blocks all traffic to the LB IP(s) except the specific ports in your Service manifest (allowed by a new ALLOW rule at priority 999). This closes the exposure gap by default.</p>
+      <p style="margin-top: 0.8rem;"><strong>Why this might break things:</strong></p>
+      <ul style="margin: 0.4rem 0 0.8rem 1.5rem;">
+        <li><strong>Scenario A</strong> &mdash; If you have custom ALLOW rules at P1000 that permit traffic to GKE nodes, the new DENY at the same priority will override them &mdash; blocking traffic you currently allow.</li>
+        <li><strong>Scenario B</strong> &mdash; If you have custom DENY rules at P1000 (e.g. geo-blocking), the new ALLOW at P999 takes precedence &mdash; bypassing your block.</li>
       </ul>
-      <p><strong>Scenario A</strong> &mdash; Custom ALLOW rules at P1000 may be overridden by the new GKE DENY at P1000, blocking traffic they previously permitted.</p>
-      <p><strong>Scenario B</strong> &mdash; Custom DENY rules at P1000 (e.g. geo-blocking) will be bypassed by the new GKE ALLOW at P999.</p>
       <p style="margin-top: 0.8rem;"><strong>Severity levels:</strong></p>
       <ul style="margin: 0.4rem 0 0.4rem 1.5rem;">
         <li><span class="badge badge-high">HIGH</span> &mdash; Rule will be directly affected. Action required before GKE 1.35.1 rollout.</li>
