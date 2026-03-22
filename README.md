@@ -12,7 +12,7 @@ Scans your GCP projects to assess the impact of the [GKE 1.35.1 firewall rule ch
 
 ## Quick Start (Cloud Shell)
 
-[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/nirforer/gke-firewall-changes.git&cloudshell_open_in_editor=README.md&shellonly=true&cloudshell_tutorial=tutorial.md)
+[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/open?git_repo=https://github.com/nirforer/gke-firewall-changes.git&page=shell&tutorial=tutorial.md)
 
 Or manually in Cloud Shell:
 
