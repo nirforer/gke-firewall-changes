@@ -22,7 +22,7 @@ pick_one() {
   local count=${#options[@]}
 
   # Hide cursor
-  tput civis 2>/dev/null
+  tput civis >/dev/tty 2>/dev/null
 
   # Print prompt
   echo "$prompt" >/dev/tty
@@ -31,7 +31,7 @@ pick_one() {
   # Draw options
   _draw_menu() {
     for i in "${!options[@]}"; do
-      tput el 2>/dev/null  # clear line
+      tput el >/dev/tty 2>/dev/null  # clear line
       if [ $i -eq $selected ]; then
         echo -e "  \033[1;36m❯ ${options[$i]}\033[0m" >/dev/tty
       else
@@ -62,12 +62,12 @@ pick_one() {
         ;;
     esac
     # Move cursor up to redraw
-    tput cuu $count 2>/dev/null
+    tput cuu $count >/dev/tty 2>/dev/null
     _draw_menu
   done
 
   # Show cursor
-  tput cnorm 2>/dev/null
+  tput cnorm >/dev/tty 2>/dev/null
   echo "" >/dev/tty
 
   # Return selected option (this goes to stdout for capture)
