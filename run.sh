@@ -112,6 +112,9 @@ echo "  GKE 1.35.1 Firewall Change Discovery"
 echo "============================================"
 echo ""
 
+# Kill any leftover server from a previous run
+fuser -k 8080/tcp 2>/dev/null || true
+
 # Install fzf if not available (needed for interactive selection)
 if ! command -v fzf &>/dev/null; then
   echo "Installing fzf..."
