@@ -112,6 +112,12 @@ echo "  GKE 1.35.1 Firewall Change Discovery"
 echo "============================================"
 echo ""
 
+# Install fzf if not available (needed for interactive selection)
+if ! command -v fzf &>/dev/null; then
+  echo "Installing fzf..."
+  sudo apt-get install -y -qq fzf 2>/dev/null || true
+fi
+
 # Install dependencies
 if [ ! -d ".venv" ]; then
   echo "Setting up Python environment..."
