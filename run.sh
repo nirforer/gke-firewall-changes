@@ -25,17 +25,17 @@ pick_one() {
   tput civis 2>/dev/null
 
   # Print prompt
-  echo "$prompt"
-  echo ""
+  echo "$prompt" >/dev/tty
+  echo "" >/dev/tty
 
   # Draw options
   _draw_menu() {
     for i in "${!options[@]}"; do
       tput el 2>/dev/null  # clear line
       if [ $i -eq $selected ]; then
-        echo -e "  \033[1;36m❯ ${options[$i]}\033[0m"
+        echo -e "  \033[1;36m❯ ${options[$i]}\033[0m" >/dev/tty
       else
-        echo -e "    ${options[$i]}"
+        echo -e "    ${options[$i]}" >/dev/tty
       fi
     done
   }
@@ -44,10 +44,10 @@ pick_one() {
 
   # Read keys
   while true; do
-    read -rsn1 key
+    read -rsn1 key </dev/tty
     case "$key" in
       $'\x1b')  # escape sequence
-        read -rsn2 rest
+        read -rsn2 rest </dev/tty
         case "$rest" in
           '[A') # up
             ((selected > 0)) && ((selected--))
@@ -68,9 +68,9 @@ pick_one() {
 
   # Show cursor
   tput cnorm 2>/dev/null
-  echo ""
+  echo "" >/dev/tty
 
-  # Return selected option
+  # Return selected option (this goes to stdout for capture)
   echo "${options[$selected]}"
 }
 
