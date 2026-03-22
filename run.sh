@@ -96,7 +96,7 @@ pick_from_list() {
   fi
 
   if command -v fzf &>/dev/null; then
-    printf '%s\n' "${items[@]}" | fzf --height=~20 --prompt="$prompt " --reverse </dev/tty
+    printf '%s\n' "${items[@]}" | fzf --height=20 --prompt="$prompt " --reverse </dev/tty
   else
     pick_one "$prompt" "${items[@]}"
   fi
