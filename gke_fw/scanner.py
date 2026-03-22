@@ -195,4 +195,28 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
 
     result.quota_usage, result.quota_limit = get_project_quota(hp)
 
+    # Check if quota will be exceeded after the change adds up to 2 new
+    # firewall rules per External LB (one IPv4 DENY, one IPv6 DENY).
+    if result.quota_limit > 0 and result.external_lbs:
+        new_rules = len(result.external_lbs) * 2
+        projected_usage = result.quota_usage + new_rules
+        if projected_usage > result.quota_limit:
+            result.conflicting_rules.append(Finding(
+                project=hp, vpc_type=vpc_type, severity="HIGH",
+                category="Quota", rule_name="-",
+                detail=f"Current: {result.quota_usage}/{result.quota_limit}, "
+                       f"after change: ~{projected_usage}/{result.quota_limit} "
+                       f"(+{new_rules} rules for {len(result.external_lbs)} LBs)",
+                action="Request a firewall rule quota increase.",
+            ))
+        elif projected_usage > result.quota_limit * 0.8:
+            result.conflicting_rules.append(Finding(
+                project=hp, vpc_type=vpc_type, severity="INFO",
+                category="Quota", rule_name="-",
+                detail=f"Current: {result.quota_usage}/{result.quota_limit}, "
+                       f"after change: ~{projected_usage}/{result.quota_limit} "
+                       f"(+{new_rules} rules for {len(result.external_lbs)} LBs)",
+                action="Monitor quota — approaching limit.",
+            ))
+
     return result

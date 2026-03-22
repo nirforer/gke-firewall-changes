@@ -118,6 +118,16 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p("- Test in staging before modifying production rules")
         p()
 
+    quota_findings = [f for f in all_findings if f.category == "Quota"]
+    if quota_findings:
+        p(f"## Firewall Rule Quota\n")
+        p(f"The change adds up to 2 new firewall rules per External LB (IPv4 + IPv6 DENY).\n")
+        p(f"| Severity | Project | Detail | Action |")
+        p(f"|----------|---------|--------|--------|")
+        for f in quota_findings:
+            p(f"| {f.severity} | {f.project} | {f.detail} | {f.action} |")
+        p()
+
     p(f"## Per-Project Summary\n")
     p(f"| Project | Type | Ext LBs | Rules to Fix | Quota |")
     p(f"|---------|------|---------|-------------|-------|")
@@ -346,6 +356,22 @@ gcloud compute firewall-rules delete $RULE --project=$PROJECT</code></pre>
     else:
         remediation_section = ""
 
+    # Quota warnings
+    quota_findings = [f for f in all_findings if f.category == "Quota"]
+    if quota_findings:
+        rows = ""
+        for f in quota_findings:
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td>{f.detail}</td><td>{f.action}</td></tr>\n"
+        quota_section = f"""
+        <h2>Firewall Rule Quota</h2>
+        <p>The change adds up to 2 new firewall rules per External LB (IPv4 + IPv6 DENY).</p>
+        <table>
+          <thead><tr><th>Severity</th><th data-sort>Project</th><th>Detail</th><th>Action</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>"""
+    else:
+        quota_section = ""
+
     # Errors
     all_errors = [e for r in results for e in r.errors]
     if all_errors:
@@ -372,6 +398,7 @@ gcloud compute firewall-rules delete $RULE --project=$PROJECT</code></pre>
         p999_section=p999_section,
         project_summary_section=project_summary_section,
         remediation_section=remediation_section,
+        quota_section=quota_section,
         errors_section=errors_section,
     )
 
@@ -381,7 +408,7 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
                    lb_card_class, rules_card_class, issues_card_class,
                    result_banner, external_lbs_section, scenario_a_section,
                    scenario_b_section, p999_section, project_summary_section,
-                   remediation_section, errors_section):
+                   remediation_section, quota_section, errors_section):
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -472,6 +499,8 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
   {scenario_b_section}
 
   {remediation_section}
+
+  {quota_section}
 
   {project_summary_section}
 
