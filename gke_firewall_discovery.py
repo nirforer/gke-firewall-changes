@@ -151,7 +151,7 @@ def main():
             def __init__(self, *a, **kw):
                 super().__init__(*a, directory=report_dir, **kw)
             def do_GET(self):
-                if self.path == "/":
+                if self.path == "/" or self.path.startswith("/?"):
                     self.path = f"/{report_name}"
                 return super().do_GET()
             def log_message(self, fmt, *a):
