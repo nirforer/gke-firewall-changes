@@ -25,12 +25,14 @@ else
   source .venv/bin/activate
 fi
 
-# Check auth
-if ! gcloud auth application-default print-access-token &>/dev/null; then
+# Check auth — Cloud Shell needs explicit ADC login for Python SDKs
+ADC_FILE="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}/application_default_credentials.json"
+if [ ! -f "$ADC_FILE" ]; then
   echo ""
-  echo "You need to authenticate first:"
+  echo "Python GCP SDKs need Application Default Credentials."
+  echo "Running: gcloud auth application-default login"
   echo ""
-  gcloud auth application-default login
+  gcloud auth application-default login --no-launch-browser
   echo ""
 fi
 

@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import google.auth
+import google.auth.transport.requests
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import compute_v1
 from google.cloud import container_v1
@@ -1007,9 +1008,19 @@ def main():
     # Auth check
     try:
         credentials, project = google.auth.default()
+        # Verify credentials actually work (Cloud Shell metadata creds can fail with SDK)
+        credentials.refresh(google.auth.transport.requests.Request())
         status(f"Authenticated (default project: {project or 'none'})")
     except DefaultCredentialsError:
         print("ERROR: No credentials found. Run: gcloud auth application-default login", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        if "email" in str(e) or "metadata" in str(e):
+            print("ERROR: Cloud Shell default credentials don't work with Python SDKs.", file=sys.stderr)
+            print("Run: gcloud auth application-default login --no-launch-browser", file=sys.stderr)
+        else:
+            print(f"ERROR: Auth failed: {e}", file=sys.stderr)
+            print("Run: gcloud auth application-default login", file=sys.stderr)
         sys.exit(1)
 
     # Discovery
