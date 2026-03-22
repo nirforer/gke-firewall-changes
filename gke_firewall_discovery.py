@@ -159,7 +159,7 @@ def main():
 
         port = args.port
         status(f"\n  Serving report at http://localhost:{port}")
-        status(f"  In Cloud Shell: click \033[5m'Web Preview' → 'Preview on port {port}'\033[0m")
+        status(f"  In Cloud Shell: click \033[5m'Web Preview' → 'Preview on port {port}'\033[0m (top-right, next to the blue icon)")
         status(f"  Press Ctrl+C to stop.\n")
 
         socketserver.TCPServer.allow_reuse_address = True
