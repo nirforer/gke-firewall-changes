@@ -1,10 +1,13 @@
 # GKE 1.35.1 Firewall Change Discovery
 
-Scans your GCP projects to assess the impact of the [GKE 1.35.1 firewall rule change](https://cloud.google.com/kubernetes-engine/docs/concepts/firewall-rules) for External LoadBalancer Services.
+Scans your GCP projects to assess the impact of the GKE 1.35.1 firewall rule change (GCP ref: 493570689) for External LoadBalancer Services.
+
+**What's changing:** In GKE 1.35.1-gke.1473000, the GKE-managed ALLOW rule for External LB Service ports moves from priority 1000 to 999, and a new DENY rule is added at priority 1000 blocking all other traffic to the LB IP(s).
 
 **What it checks:**
 - External LoadBalancer Services across all GKE clusters
 - Custom firewall rules at priority 999 and 1000 that may conflict
+- Exact GKE node pool tag matching (with fallback heuristic)
 - Shared VPC and standalone project configurations
 - Firewall quota headroom
 
@@ -45,10 +48,10 @@ python3 gke_firewall_discovery.py --project=my-project --output=report.html
 python3 gke_firewall_discovery.py --host-project=my-network-project --output=report.html
 
 # Scan all projects in a folder
-python3 gke_firewall_discovery.py --folder=123456789 --limit=100 --output=report.html
+python3 gke_firewall_discovery.py --folder=123456789 --output=report.html
 
 # Scan all projects in an org
-python3 gke_firewall_discovery.py --org=987654321 --limit=200 --output=report.html
+python3 gke_firewall_discovery.py --org=987654321 --output=report.html
 
 # Generate and serve HTML report (for Cloud Shell Web Preview)
 python3 gke_firewall_discovery.py --host-project=my-project --serve
@@ -65,8 +68,7 @@ python3 gke_firewall_discovery.py --host-project=my-project --output=report.md
 | `--host-project=ID` | Scan a shared VPC host project (repeatable) |
 | `--folder=ID` | Scan all projects in a GCP folder |
 | `--org=ID` | Scan all projects in a GCP organization |
-| `--all-projects` | Auto-discover projects (up to --limit) |
-| `--limit=N` | Max projects to scan in discovery mode (default: 50) |
+| `--all-projects` | Auto-discover all accessible projects |
 | `--workers=N` | Parallel API workers (default: 15) |
 | `--output=FILE` | Write report to file (.html or .md) |
 | `--serve` | Serve HTML report on port 8080 for Web Preview |
@@ -80,36 +82,35 @@ python3 gke_firewall_discovery.py --host-project=my-project --output=report.md
 |-------|------|---------|
 | Host/Network project | `roles/compute.viewer` | List firewall rules, quota |
 | Service/GKE projects | `roles/compute.viewer` | List forwarding rules |
-| Service/GKE projects | `roles/container.viewer` | List GKE clusters |
+| Service/GKE projects | `roles/container.viewer` | List GKE clusters and node pool tags |
 | Org/Folder (optional) | `roles/resourcemanager.folderViewer` | Auto-discover projects |
 
 ## What the Script Detects
 
 ### Scenario A — Custom ALLOW rules at priority 1000
 
-After GKE 1.35.1, a new GKE-managed DENY rule at priority 1000 will block traffic to External LB IPs on non-service ports. Custom ALLOW rules at the same priority will be overridden (DENY wins at equal priority).
+The new GKE-managed DENY rule at priority 1000 will block traffic to External LB IPs on non-service ports. Custom ALLOW rules at the same priority may be overridden, blocking traffic they previously permitted.
 
 **Fix:** Move affected ALLOW rules to priority 998.
 
 ### Scenario B — Custom DENY rules at priority 1000
 
-The existing GKE-managed ALLOW rule moves from priority 1000 to 999. Custom DENY rules at priority 1000 that previously blocked this traffic will now be bypassed (999 takes precedence over 1000).
+The GKE-managed ALLOW rule moves from priority 1000 to 999. Custom DENY rules at priority 1000 (e.g. geo-blocking) will be bypassed since 999 takes precedence over 1000.
 
-**Fix:** Move affected DENY rules to priority 998.
+**Fix:** Move affected DENY rules to priority 999 (DENY wins over ALLOW at the same priority) or lower.
 
 ## Architecture
 
 ```
-Discovery Phase (parallel)
-├── List projects in org/folder
-├── Classify each: HOST / SERVICE / STANDALONE
-├── Resolve shared VPC host → service project mappings
-└── Check standalone projects for GKE clusters
-
-Scan Phase (parallel per target)
-├── Firewall rules analysis (priority 999, 1000)
+Scan Phase (parallel per service project)
 ├── External LB detection (forwarding rules API)
-├── GKE cluster inventory
+├── GKE cluster inventory + node pool tag extraction
+└── Results collected before firewall analysis
+
+Analysis Phase (per host/network project)
+├── Firewall rules analysis (priority 999, 1000)
+├── Exact node tag matching against discovered GKE node pools
+│   └── Fallback to "gke-" prefix heuristic if tags unavailable
 └── Quota check
 
 Report Phase
