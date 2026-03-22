@@ -88,8 +88,20 @@ def list_forwarding_rules(project: str) -> list[dict]:
 def list_gke_clusters(project: str) -> list[dict]:
     try:
         response = get_clients().gke.list_clusters(parent=f"projects/{project}/locations/-")
-        return [{"name": c.name, "location": c.location, "version": c.current_master_version}
-                for c in response.clusters]
+        clusters = []
+        for c in response.clusters:
+            # Collect all unique network tags across node pools
+            node_tags = set()
+            for np in c.node_pools:
+                if np.config and np.config.tags:
+                    node_tags.update(np.config.tags)
+            clusters.append({
+                "name": c.name,
+                "location": c.location,
+                "version": c.current_master_version,
+                "node_tags": list(node_tags),
+            })
+        return clusters
     except (PermissionDenied, NotFound, Forbidden, Exception):
         return []
 

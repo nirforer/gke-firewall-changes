@@ -33,6 +33,34 @@ from .clients import (
 )
 
 
+def _scan_service_project(project_id: str) -> tuple[list[ExternalLB], set[str]]:
+    """Scan a service project for External LBs and GKE node tags."""
+    lbs = []
+    node_tags = set()
+    for fr in list_forwarding_rules(project_id):
+        lbs.append(ExternalLB(
+            project=project_id, name=fr["name"], ip=fr["ip"],
+            ports=fr["ports"], region=fr["region"],
+        ))
+    clusters = list_gke_clusters(project_id)
+    for cl in clusters:
+        node_tags.update(cl.get("node_tags", []))
+        for lb in lbs:
+            if not lb.cluster:
+                lb.cluster = cl["name"]
+                lb.cluster_version = cl["version"]
+    return lbs, node_tags
+
+
+def _has_gke_node_tag(rule_tags: list[str], known_node_tags: set[str]) -> bool:
+    """Check if a firewall rule targets GKE nodes by matching its target
+    tags against known node pool tags. Falls back to the 'gke-' prefix
+    heuristic if no node tags were discovered (e.g. permission denied)."""
+    if known_node_tags:
+        return bool(set(rule_tags) & known_node_tags)
+    return any("gke-" in t for t in rule_tags)
+
+
 def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
     hp = target.host_project
     result = ProjectResult(
@@ -42,12 +70,32 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
     )
     vpc_type = "Shared VPC" if target.is_shared_vpc else "Standalone"
 
+    # --- Phase 1: Scan service projects for LBs and GKE node tags ---
+    # We need node tags before analyzing firewall rules so we can do
+    # exact tag matching instead of the "gke-" prefix heuristic.
+    all_node_tags: set[str] = set()
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_proj = {
+            executor.submit(_scan_service_project, sp): sp
+            for sp in target.service_projects
+        }
+        for future in as_completed(future_to_proj):
+            proj = future_to_proj[future]
+            try:
+                lbs, tags = future.result()
+                result.external_lbs.extend(lbs)
+                all_node_tags.update(tags)
+            except Exception as e:
+                result.errors.append(f"Error scanning {proj}: {e}")
+
+    # --- Phase 2: Analyze firewall rules using discovered node tags ---
     all_rules = list_firewall_rules(hp)
     if not all_rules:
         result.errors.append(f"Cannot list firewall rules in {hp}")
         return result
 
-    # --- Identify existing GKE-managed External LB firewall rules (INFO) ---
+    # Identify existing GKE-managed External LB firewall rules (INFO)
     for r in all_rules:
         if r.priority == 1000 and r.name.startswith("k8s-fw-") and not r.name.startswith("k8s-fw-l7"):
             try:
@@ -66,9 +114,8 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-    # --- Custom rules at P999 ---
-    # Only flag ALLOW rules. DENY rules at P999 are safe — they win over
-    # the new GKE ALLOW at the same priority per GCP firewall semantics.
+    # Custom rules at P999 — only ALLOW rules. DENY rules at P999 are
+    # safe (they win over ALLOW at the same priority).
     for r in all_rules:
         if r.priority == 999 and not r.name.startswith("gke-") and r.is_allow:
             result.conflicting_rules.append(Finding(
@@ -81,9 +128,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 action="Review — new GKE ALLOW also at P999.",
             ))
 
-    # --- Custom rules at P1000 (INGRESS only) ---
-    # EGRESS rules are not affected by this change — the GKE 1.35.1 update
-    # only modifies INGRESS rules for External LoadBalancer Services.
+    # Custom rules at P1000 (INGRESS only) — EGRESS is not affected.
     custom_p1000 = [r for r in all_rules
                     if r.priority == 1000 and r.direction == "INGRESS"
                     and not r.name.startswith("gke-") and not r.name.startswith("k8s-")]
@@ -101,8 +146,9 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 target_tags="(none)",
                 action="Move to P998.",
             ))
-        elif r.is_allow and r.has_gke_tags:
-            # Scenario A — MEDIUM: directly targets GKE nodes
+        elif r.is_allow and _has_gke_node_tag(r.target_tags, all_node_tags):
+            # Scenario A — MEDIUM: targets GKE nodes (exact tag match
+            # against discovered node pool tags, or "gke-" heuristic)
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="MEDIUM",
                 category="Scenario A", rule_name=r.name,
@@ -113,8 +159,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 action="Move to P998.",
             ))
         elif r.is_allow:
-            # Scenario A — INFO: has non-GKE tags, unlikely to affect GKE
-            # nodes but included for completeness per GCP advisory
+            # Scenario A — INFO: tags don't match any known GKE node tags
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Scenario A", rule_name=r.name,
@@ -122,7 +167,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 rule_action="ALLOW", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
                 target_tags=",".join(r.target_tags),
-                detail="non-GKE tags",
+                detail="tags don't match GKE nodes",
                 action="Review if tags overlap with GKE node targets.",
             ))
         elif r.is_deny:
@@ -138,30 +183,5 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             ))
 
     result.quota_usage, result.quota_limit = get_project_quota(hp)
-
-    # --- Service project scanning for External LBs ---
-    def scan_svc(project_id: str) -> list[ExternalLB]:
-        lbs = []
-        for fr in list_forwarding_rules(project_id):
-            lbs.append(ExternalLB(
-                project=project_id, name=fr["name"], ip=fr["ip"],
-                ports=fr["ports"], region=fr["region"],
-            ))
-        clusters = list_gke_clusters(project_id)
-        for cl in clusters:
-            for lb in lbs:
-                if not lb.cluster:
-                    lb.cluster = cl["name"]
-                    lb.cluster_version = cl["version"]
-        return lbs
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_proj = {executor.submit(scan_svc, sp): sp for sp in target.service_projects}
-        for future in as_completed(future_to_proj):
-            proj = future_to_proj[future]
-            try:
-                result.external_lbs.extend(future.result())
-            except Exception as e:
-                result.errors.append(f"Error scanning {proj}: {e}")
 
     return result
