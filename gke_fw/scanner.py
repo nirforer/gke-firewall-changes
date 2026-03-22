@@ -147,10 +147,10 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 action="Move to P998.",
             ))
         elif r.is_allow and _has_gke_node_tag(r.target_tags, all_node_tags):
-            # Scenario A — MEDIUM: targets GKE nodes (exact tag match
+            # Scenario A — HIGH: targets GKE nodes (exact tag match
             # against discovered node pool tags, or "gke-" heuristic)
             result.conflicting_rules.append(Finding(
-                project=hp, vpc_type=vpc_type, severity="MEDIUM",
+                project=hp, vpc_type=vpc_type, severity="HIGH",
                 category="Scenario A", rule_name=r.name,
                 priority=r.priority, direction=r.direction,
                 rule_action="ALLOW", protocols=r.action_str,
