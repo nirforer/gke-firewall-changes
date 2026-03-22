@@ -31,10 +31,10 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     for r in results:
         all_findings.extend(r.conflicting_rules)
         all_lbs.extend(r.external_lbs)
-        if r.external_lbs or any(f.severity in ("HIGH", "MEDIUM") for f in r.conflicting_rules):
+        if r.external_lbs or any(f.severity == "HIGH" for f in r.conflicting_rules):
             projects_with_issues += 1
 
-    actionable = [f for f in all_findings if f.severity in ("HIGH", "MEDIUM") and f.category.startswith("Scenario")]
+    actionable = [f for f in all_findings if f.severity == "HIGH" and f.category.startswith("Scenario")]
 
     p()
     p(f"{'=' * 70}")
@@ -52,8 +52,7 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     p()
     p(f"**Severity levels:**")
     p(f"- **HIGH** — Rule will be directly affected. Action required before GKE 1.35.1 rollout.")
-    p(f"- **MEDIUM** — Rule may conflict with new GKE rules at the same priority. Review recommended.")
-    p(f"- **INFO** — Rule is at P1000 but does not target GKE nodes. No action needed.")
+    p(f"- **INFO** — Rule is not affected by this change. Listed for awareness.")
     p()
     p(f"## Overview\n")
     p(f"| Metric | Count |")
@@ -106,7 +105,9 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
 
     p999_findings = [f for f in all_findings if f.category == "Custom P999"]
     if p999_findings:
-        p(f"### Custom Rules at Priority 999 (review recommended)\n")
+        p(f"### Custom Rules at Priority 999\n")
+        p(f"These rules are not affected by the GKE 1.35.1 change. Listed for awareness as they")
+        p(f"share priority with the new GKE ALLOW rules.\n")
         p(f"| Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
         p(f"|---------|------|----------|--------|-----------|---------------|-------------|")
         for f in p999_findings:
@@ -130,7 +131,7 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     for r in results:
         vpc_type = "Shared VPC" if r.is_shared_vpc else "Standalone"
         n_lbs = len(r.external_lbs)
-        n_fix = len([f for f in r.conflicting_rules if f.severity in ("HIGH", "MEDIUM") and f.category.startswith("Scenario")])
+        n_fix = len([f for f in r.conflicting_rules if f.severity == "HIGH" and f.category.startswith("Scenario")])
         quota = f"{r.quota_usage}/{r.quota_limit}" if r.quota_limit else "-"
         marker = " **" if n_lbs > 0 or n_fix > 0 else ""
         p(f"| {r.host_project}{marker} | {vpc_type} | {n_lbs} | {n_fix} | {quota} |")
@@ -180,10 +181,10 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     for r in results:
         all_findings.extend(r.conflicting_rules)
         all_lbs.extend(r.external_lbs)
-        if r.external_lbs or any(f.severity in ("HIGH", "MEDIUM") for f in r.conflicting_rules):
+        if r.external_lbs or any(f.severity == "HIGH" for f in r.conflicting_rules):
             projects_with_issues += 1
 
-    actionable = [f for f in all_findings if f.severity in ("HIGH", "MEDIUM") and f.category.startswith("Scenario")]
+    actionable = [f for f in all_findings if f.severity == "HIGH" and f.category.startswith("Scenario")]
 
     def badge(severity):
         cls = {"HIGH": "badge-high", "MEDIUM": "badge-medium", "INFO": "badge-info"}.get(severity, "badge-info")
@@ -263,7 +264,7 @@ def generate_html_report(results: list[ProjectResult]) -> str:
         for f in p999:
             rows += f"<tr><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
         p999_section = f"""
-        <details><summary>Custom Rules at Priority 999 ({len(p999)} rule(s) — review recommended)</summary>
+        <details><summary>Custom Rules at Priority 999 ({len(p999)} rule(s)) — not affected, listed for awareness</summary>
         <table>
           <thead><tr><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
           <tbody>{rows}</tbody>
@@ -276,7 +277,7 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     for r in results:
         vpc_type = "Shared VPC" if r.is_shared_vpc else "Standalone"
         n_lbs = len(r.external_lbs)
-        n_fix = len([f for f in r.conflicting_rules if f.severity in ("HIGH", "MEDIUM") and f.category.startswith("Scenario")])
+        n_fix = len([f for f in r.conflicting_rules if f.severity == "HIGH" and f.category.startswith("Scenario")])
         quota = f"{r.quota_usage}/{r.quota_limit}" if r.quota_limit else "-"
         status_badge = badge("HIGH") if n_fix > 0 else '<span class="badge badge-clean">clean</span>'
         rows += f"<tr><td>{r.host_project}</td><td>{vpc_type}</td><td>{n_lbs}</td><td>{n_fix}</td><td>{quota}</td><td>{status_badge}</td></tr>\n"
@@ -433,8 +434,7 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
       <p style="margin-top: 0.8rem;"><strong>Severity levels:</strong></p>
       <ul style="margin: 0.4rem 0 0.4rem 1.5rem;">
         <li><span class="badge badge-high">HIGH</span> &mdash; Rule will be directly affected. Action required before GKE 1.35.1 rollout.</li>
-        <li><span class="badge badge-medium">MEDIUM</span> &mdash; Rule may conflict with new GKE rules at the same priority. Review recommended.</li>
-        <li><span class="badge badge-info">INFO</span> &mdash; Rule is at P1000 but does not target GKE nodes. No action needed.</li>
+        <li><span class="badge badge-info">INFO</span> &mdash; Rule is not affected by this change. Listed for awareness.</li>
       </ul>
       <p style="margin-top: 0.5rem; color: #8b949e; font-size: 0.85rem;">Source: Google Cloud Support notification, reference issue 493570689.</p>
     </div>

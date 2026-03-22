@@ -114,18 +114,21 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-    # Custom rules at P999 — only ALLOW rules. DENY rules at P999 are
-    # safe (they win over ALLOW at the same priority).
+    # Custom rules at P999 — not affected by the change. ALLOW rules
+    # at P999 still work (both ALLOW, no conflict with new GKE ALLOW).
+    # DENY rules at P999 also fine (DENY wins over ALLOW at same priority).
+    # Listed as INFO for awareness since they share priority with new GKE rules.
     for r in all_rules:
-        if r.priority == 999 and not r.name.startswith("gke-") and r.is_allow:
+        if r.priority == 999 and not r.name.startswith("gke-"):
             result.conflicting_rules.append(Finding(
-                project=hp, vpc_type=vpc_type, severity="MEDIUM",
+                project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Custom P999", rule_name=r.name,
                 priority=r.priority, direction=r.direction,
                 rule_action=r.rule_type, protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
                 target_tags=",".join(r.target_tags),
-                action="Review — new GKE ALLOW also at P999.",
+                detail="not affected by this change",
+                action="No action needed.",
             ))
 
     # Custom rules at P1000 (INGRESS only) — EGRESS is not affected.
