@@ -136,91 +136,83 @@ if ! gcloud auth print-access-token &>/dev/null; then
   echo ""
 fi
 
-# Step 1: Pick scan scope
-echo ""
-SCOPE=$(pick_one "How would you like to scan?" \
-  "Organization (scan all projects in an org)" \
-  "Folder (scan all projects in a folder)" \
-  "Project (scan a single project)" \
-  "Host project (shared VPC — auto-discovers service projects)" \
-  "Custom flags")
+# Step 1: Pick scan scope (loop allows going back with Escape)
+while true; do
+  echo ""
+  SCOPE=$(pick_one "How would you like to scan?" \
+    "Organization (scan all projects in an org)" \
+    "Folder (scan all projects in a folder)" \
+    "Project (scan a single project)" \
+    "Host project (shared VPC — auto-discovers service projects)" \
+    "Custom flags")
 
-EXTRA_FLAGS=""
+  EXTRA_FLAGS=""
 
-case "$SCOPE" in
-  Project*)
-    echo "Loading your projects..."
-    PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
-    SELECTED=$(pick_from_list "Select a project:" <<< "$PROJECTS")
-    if [ -z "$SELECTED" ]; then
-      echo "No projects found."
-      exit 1
-    fi
-    EXTRA_FLAGS="--project=${SELECTED}"
-    ;;
+  case "$SCOPE" in
+    Project*)
+      echo "Loading your projects..."
+      PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
+      SELECTED=$(pick_from_list "Select a project:" <<< "$PROJECTS")
+      [ -z "$SELECTED" ] && echo "  (back)" && continue
+      EXTRA_FLAGS="--project=${SELECTED}"
+      ;;
 
-  Host*)
-    echo "Loading your projects..."
-    PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
-    SELECTED=$(pick_from_list "Select the shared VPC host project:" <<< "$PROJECTS")
-    if [ -z "$SELECTED" ]; then
-      echo "No projects found."
-      exit 1
-    fi
-    EXTRA_FLAGS="--host-project=${SELECTED}"
-    ;;
+    Host*)
+      echo "Loading your projects..."
+      PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
+      SELECTED=$(pick_from_list "Select the shared VPC host project:" <<< "$PROJECTS")
+      [ -z "$SELECTED" ] && echo "  (back)" && continue
+      EXTRA_FLAGS="--host-project=${SELECTED}"
+      ;;
 
-  Folder*)
-    echo "Loading your organizations..."
-    ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
-      echo "${id}  ${name}"
-    done)
-    ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
-    ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+    Folder*)
+      echo "Loading your organizations..."
+      ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
+        echo "${id}  ${name}"
+      done)
+      ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
+      ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+      [ -z "$ORG_ID" ] && echo "  (back)" && continue
 
-    if [ -n "$ORG_ID" ]; then
       echo "Loading folders in org ${ORG_ID}..."
       FOLDERS=$(gcloud resource-manager folders list --organization="$ORG_ID" --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
         echo "${id}  ${name}"
       done)
       FOLDER_LINE=$(pick_from_list "Select a folder:" <<< "$FOLDERS")
       FOLDER_ID=$(echo "$FOLDER_LINE" | awk '{print $1}')
-    fi
+      [ -z "$FOLDER_ID" ] && echo "  (back)" && continue
 
-    if [ -z "$FOLDER_ID" ]; then
-      read -p "Folder ID: " FOLDER_ID
-    fi
+      EXTRA_FLAGS="--folder=${FOLDER_ID}"
+      ;;
 
-    EXTRA_FLAGS="--folder=${FOLDER_ID}"
-    ;;
+    Organization*)
+      echo "Loading your organizations..."
+      ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
+        echo "${id}  ${name}"
+      done)
+      ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
+      ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+      [ -z "$ORG_ID" ] && echo "  (back)" && continue
 
-  Organization*)
-    echo "Loading your organizations..."
-    ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
-      echo "${id}  ${name}"
-    done)
-    ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
-    ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+      EXTRA_FLAGS="--org=${ORG_ID}"
+      ;;
 
-    if [ -z "$ORG_ID" ]; then
-      read -p "Organization ID: " ORG_ID
-    fi
+    Custom*)
+      echo ""
+      echo "Available flags:"
+      echo "  --project=PROJECT         Scan a specific project"
+      echo "  --host-project=PROJECT    Scan a shared VPC host project"
+      echo "  --folder=FOLDER_ID        Scan all projects in a folder"
+      echo "  --org=ORG_ID              Scan all projects in an org"
+      echo "  --workers=N               Parallel workers (default: 15)"
+      echo ""
+      read -p "Enter flags (or empty to go back): " EXTRA_FLAGS
+      [ -z "$EXTRA_FLAGS" ] && continue
+      ;;
+  esac
 
-    EXTRA_FLAGS="--org=${ORG_ID}"
-    ;;
-
-  Custom*)
-    echo ""
-    echo "Available flags:"
-    echo "  --project=PROJECT         Scan a specific project"
-    echo "  --host-project=PROJECT    Scan a shared VPC host project"
-    echo "  --folder=FOLDER_ID        Scan all projects in a folder"
-    echo "  --org=ORG_ID              Scan all projects in an org"
-    echo "  --workers=N               Parallel workers (default: 15)"
-    echo ""
-    read -p "Enter flags: " EXTRA_FLAGS
-    ;;
-esac
+  break
+done
 
 echo ""
 echo "Running discovery..."
