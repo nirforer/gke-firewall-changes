@@ -181,16 +181,48 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 detail=detail,
                 action=action,
             ))
-        elif r.is_deny:
-            # Scenario B — HIGH: new GKE ALLOW at P999 will bypass this DENY
+        elif r.is_deny and r.has_no_tags:
+            # Scenario B — HIGH: applies to all instances including GKE nodes,
+            # new GKE ALLOW at P999 will bypass this DENY for LB traffic
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="HIGH",
                 category="Scenario B", rule_name=r.name,
                 priority=r.priority, direction=r.direction,
                 rule_action="DENY", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
-                target_tags=",".join(r.target_tags) or "All instances",
+                target_tags="All instances",
                 action="Move to P999 or lower.",
+            ))
+        elif r.is_deny and _has_gke_node_tag(r.target_tags, all_node_tags):
+            # Scenario B — HIGH: targets GKE nodes, new GKE ALLOW at P999
+            # will bypass this DENY for LB traffic
+            result.conflicting_rules.append(Finding(
+                project=hp, vpc_type=vpc_type, severity="HIGH",
+                category="Scenario B", rule_name=r.name,
+                priority=r.priority, direction=r.direction,
+                rule_action="DENY", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags),
+                action="Move to P999 or lower.",
+            ))
+        elif r.is_deny:
+            # Scenario B — INFO: DENY with non-GKE tags, doesn't target
+            # GKE nodes so the new GKE ALLOW at P999 won't bypass it
+            if all_node_tags:
+                detail = "does not target GKE nodes"
+                action = "No action needed."
+            else:
+                detail = "could not verify against GKE node tags"
+                action = "Verify manually — GKE node tags could not be read."
+            result.conflicting_rules.append(Finding(
+                project=hp, vpc_type=vpc_type, severity="INFO",
+                category="Scenario B", rule_name=r.name,
+                priority=r.priority, direction=r.direction,
+                rule_action="DENY", protocols=r.action_str,
+                source_ranges=",".join(r.source_ranges),
+                target_tags=",".join(r.target_tags),
+                detail=detail,
+                action=action,
             ))
 
     result.quota_usage, result.quota_limit = get_project_quota(hp)

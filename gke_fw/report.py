@@ -170,9 +170,9 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p()
 
     # INFO findings for awareness
-    info_findings = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
+    info_findings = [f for f in all_findings if f.severity == "INFO" and f.category in ("Scenario A", "Scenario B")]
     if info_findings:
-        p(f"## Other Custom ALLOW rules at P1000\n")
+        p(f"## Other Custom rules at P1000\n")
         p(f"These rules are not affected by the GKE 1.35.1 change because they don't target GKE node tags.\n")
         p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags | Status |")
         p(f"|---------|------|----------|-----------|---------------|-------------|--------|")
@@ -270,18 +270,20 @@ def generate_html_report(results: list[ProjectResult]) -> str:
         <h2>Scenario A — Custom ALLOW Rules at P1000</h2>
         <p class="result-banner result-clean" style="font-size: 0.95rem;">No affected rules found.</p>"""
 
-    # Scenario A — INFO (non-GKE tags or unverified)
-    info_a = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
-    if info_a:
+    # INFO findings (non-GKE tags or unverified) — both Scenario A and B
+    info_p1000 = [f for f in all_findings if f.severity == "INFO" and f.category in ("Scenario A", "Scenario B")]
+    if info_p1000:
         rows = ""
-        for f in info_a:
-            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td><td>{f.detail}</td></tr>\n"
-        scenario_a_section += f"""
-        <details><summary>Other ALLOW at P1000 ({len(info_a)} rule(s)) — not affected, don't target GKE node tags</summary>
+        for f in info_p1000:
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td><td>{f.detail}</td></tr>\n"
+        info_p1000_section = f"""
+        <details><summary>Other rules at P1000 ({len(info_p1000)} rule(s)) — not affected, don't target GKE node tags</summary>
         <table>
-          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th><th>Status</th></tr></thead>
+          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th><th>Status</th></tr></thead>
           <tbody>{rows}</tbody>
         </table></details>"""
+    else:
+        info_p1000_section = ""
 
     # Scenario B
     scenario_b = [f for f in actionable if f.category == "Scenario B"]
@@ -403,6 +405,7 @@ gcloud compute firewall-rules delete $RULE --project=$PROJECT</code></pre>
         external_lbs_section=external_lbs_section,
         scenario_a_section=scenario_a_section,
         scenario_b_section=scenario_b_section,
+        info_p1000_section=info_p1000_section,
         p999_section=p999_section,
         project_summary_section=project_summary_section,
         remediation_section=remediation_section,
@@ -415,7 +418,8 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
                    total_lbs, total_actionable, projects_with_issues,
                    lb_card_class, rules_card_class, issues_card_class,
                    result_banner, external_lbs_section, scenario_a_section,
-                   scenario_b_section, p999_section, project_summary_section,
+                   scenario_b_section, info_p1000_section, p999_section,
+                   project_summary_section,
                    remediation_section, quota_section, errors_section):
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -513,6 +517,8 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
   {project_summary_section}
 
   {external_lbs_section}
+
+  {info_p1000_section}
 
   {p999_section}
 
