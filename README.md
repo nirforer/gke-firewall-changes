@@ -2,6 +2,8 @@
 
 Google sent an email (ref: 493570689) notifying customers about an upcoming change to how GKE manages firewall rules for External LoadBalancer Services. This tool helps you figure out if that change affects you.
 
+![Report Demo](https://github.com/nirforer/gke-firewall-changes/raw/main/docs/demo.png)
+
 ## What does this tool do?
 
 1. **Finds your External LoadBalancers** — scans your GKE clusters for Services of type LoadBalancer with external IPs. These are the services that the GKE change applies to.
