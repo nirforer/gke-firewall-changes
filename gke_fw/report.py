@@ -42,6 +42,14 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     p(f"  Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     p(f"{'=' * 70}")
     p()
+    p(f"## What is changing (GCP Ref: 493570689)\n")
+    p(f"In GKE 1.35.1-gke.1473000, GKE-managed ALLOW rules for External LB Services")
+    p(f"move from P1000 to P999, and a new DENY rule is added at P1000 blocking all")
+    p(f"other traffic to the LB IP(s).")
+    p()
+    p(f"- **Scenario A**: Custom ALLOW at P1000 may be overridden by the new GKE DENY at P1000.")
+    p(f"- **Scenario B**: Custom DENY at P1000 will be bypassed by the new GKE ALLOW at P999.")
+    p()
     p(f"## Overview\n")
     p(f"| Metric | Count |")
     p(f"|--------|-------|")
@@ -407,6 +415,20 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
     <div class="card {rules_card_class}"><div class="value">{total_actionable}</div><div class="label">Rules Requiring Action</div></div>
     <div class="card {issues_card_class}"><div class="value">{projects_with_issues}</div><div class="label">Projects with Issues</div></div>
   </div>
+
+  <details open>
+    <summary>What is changing (GCP Reference: 493570689)</summary>
+    <div class="note" style="margin-top: 0.5rem;">
+      <p>In <strong>GKE 1.35.1-gke.1473000</strong>, Google is changing how firewall rules are managed for External LoadBalancer Services:</p>
+      <ul style="margin: 0.8rem 0 0.8rem 1.5rem;">
+        <li>The existing GKE-managed <strong>ALLOW</strong> rule for LoadBalancer Service ports will be changed from <strong>priority 1000 to priority 999</strong>.</li>
+        <li>A new GKE-managed <strong>DENY</strong> rule will be introduced at <strong>priority 1000</strong>, blocking all other traffic to the LoadBalancer IP(s).</li>
+      </ul>
+      <p><strong>Scenario A</strong> &mdash; Custom ALLOW rules at P1000 may be overridden by the new GKE DENY at P1000, blocking traffic they previously permitted.</p>
+      <p><strong>Scenario B</strong> &mdash; Custom DENY rules at P1000 (e.g. geo-blocking) will be bypassed by the new GKE ALLOW at P999.</p>
+      <p style="margin-top: 0.5rem; color: #8b949e; font-size: 0.85rem;">Source: Google Cloud Support notification, reference issue 493570689.</p>
+    </div>
+  </details>
 
   {result_banner}
 
