@@ -75,23 +75,27 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p(f"GCP does not allow in-place priority changes. For each rule: create a copy at the target priority, verify, then delete the original.\n")
 
         scenario_a = [f for f in actionable if f.category == "Scenario A"]
+        p(f"### Scenario A — Custom ALLOW rules at P1000 (will be overridden by new GKE DENY)\n")
         if scenario_a:
-            p(f"### Scenario A — Custom ALLOW rules at P1000 (will be overridden by new GKE DENY)\n")
             p(f"| Severity | Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
             p(f"|----------|---------|------|----------|--------|-----------|---------------|-------------|")
             for f in sorted(scenario_a, key=lambda x: x.severity):
                 p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
-            p()
+        else:
+            p(f"No affected rules found.")
+        p()
 
         scenario_b = [f for f in actionable if f.category == "Scenario B"]
+        p(f"### Scenario B — Custom DENY rules at P1000 (will be bypassed by new GKE ALLOW at P999)\n")
         if scenario_b:
-            p(f"### Scenario B — Custom DENY rules at P1000 (will be bypassed by new GKE ALLOW at P999)\n")
             p(f"Move to P999 (DENY wins over ALLOW at same priority) or lower.\n")
             p(f"| Severity | Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
             p(f"|----------|---------|------|----------|--------|-----------|---------------|-------------|")
             for f in sorted(scenario_b, key=lambda x: x.severity):
                 p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
-            p()
+        else:
+            p(f"No affected rules found.")
+        p()
 
     if actionable:
         p(f"## Remediation\n")
@@ -245,7 +249,9 @@ def generate_html_report(results: list[ProjectResult]) -> str:
           <tbody>{rows}</tbody>
         </table>"""
     else:
-        scenario_a_section = ""
+        scenario_a_section = """
+        <h2>Scenario A — Custom ALLOW Rules at P1000</h2>
+        <p class="result-banner result-clean" style="font-size: 0.95rem;">No affected rules found.</p>"""
 
     # Scenario A — INFO (non-GKE tags or unverified)
     info_a = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
@@ -274,7 +280,9 @@ def generate_html_report(results: list[ProjectResult]) -> str:
           <tbody>{rows}</tbody>
         </table>"""
     else:
-        scenario_b_section = ""
+        scenario_b_section = """
+        <h2>Scenario B — Custom DENY Rules at P1000</h2>
+        <p class="result-banner result-clean" style="font-size: 0.95rem;">No affected rules found.</p>"""
 
     # P999
     p999 = [f for f in all_findings if f.category == "Custom P999"]
