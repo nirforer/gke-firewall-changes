@@ -77,6 +77,7 @@ pick_one() {
 pick_from_list() {
   # Usage: pick_from_list "prompt" < <(command that outputs lines)
   # Reads lines from stdin into an array, shows interactive picker
+  # Uses fzf for type-to-filter when available, falls back to arrow-key picker
   local prompt="$1"
   local items=()
   while IFS= read -r line; do
@@ -94,7 +95,11 @@ pick_from_list() {
     return
   fi
 
-  pick_one "$prompt" "${items[@]}"
+  if command -v fzf &>/dev/null; then
+    printf '%s\n' "${items[@]}" | fzf --height=~20 --prompt="$prompt " --reverse </dev/tty
+  else
+    pick_one "$prompt" "${items[@]}"
+  fi
 }
 
 # ============================================================
