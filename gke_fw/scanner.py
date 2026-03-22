@@ -126,7 +126,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 priority=r.priority, direction=r.direction,
                 rule_action=r.rule_type, protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
-                target_tags=",".join(r.target_tags),
+                target_tags=",".join(r.target_tags) or "All instances",
                 detail="not affected by this change",
                 action="No action needed.",
             ))

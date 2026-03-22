@@ -70,16 +70,6 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p("rules exist at priority 999 or 1000. The GKE 1.35.1 change will have no effect.")
         return
 
-    if all_lbs:
-        p(f"## External LoadBalancers\n")
-        p(f"These are the LB IPs that will get the new GKE DENY rule at P1000. GKE handles this")
-        p(f"automatically — listed here so you can cross-reference with your custom firewall rules.\n")
-        p(f"| Project | LB IP | Ports | Cluster | Version |")
-        p(f"|---------|-------|-------|---------|---------|")
-        for lb in all_lbs:
-            p(f"| {lb.project} | {lb.ip} | {lb.ports} | {lb.cluster or '-'} | {lb.cluster_version or '-'} |")
-        p()
-
     if actionable:
         p(f"## Action Required\n")
         p(f"GCP does not allow in-place priority changes. For each rule: create a copy at the target priority, verify, then delete the original.\n")
@@ -103,26 +93,26 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
                 p(f"| {f.severity} | {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
             p()
 
-    p999_findings = [f for f in all_findings if f.category == "Custom P999"]
-    if p999_findings:
-        p(f"### Custom Rules at Priority 999\n")
-        p(f"These rules are not affected by the GKE 1.35.1 change. Listed for awareness as they")
-        p(f"share priority with the new GKE ALLOW rules.\n")
-        p(f"| Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags |")
-        p(f"|---------|------|----------|--------|-----------|---------------|-------------|")
-        for f in p999_findings:
-            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
+    if actionable:
+        p(f"## Remediation\n")
+        p("```bash")
+        p('RULE="<rule-name>"')
+        p('PROJECT="<project>"')
+        p("gcloud compute firewall-rules describe $RULE --project=$PROJECT --format=json > /tmp/${RULE}.json")
+        p("")
+        p("# For Scenario A (ALLOW rules): move to P998")
+        p("gcloud compute firewall-rules create ${RULE}-p998 --project=$PROJECT --priority=998 \\")
+        p("  ... # copy parameters from exported JSON")
+        p("")
+        p("# For Scenario B (DENY rules): move to P999 or lower")
+        p("gcloud compute firewall-rules create ${RULE}-p999 --project=$PROJECT --priority=999 \\")
+        p("  ... # copy parameters from exported JSON")
+        p("")
+        p("gcloud compute firewall-rules delete $RULE --project=$PROJECT")
+        p("```")
         p()
-
-    # INFO findings for awareness
-    info_findings = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
-    if info_findings:
-        p(f"### Other Custom ALLOW rules at P1000\n")
-        p(f"These rules are not affected by the GKE 1.35.1 change because they don't target GKE node tags.\n")
-        p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags | Status |")
-        p(f"|---------|------|----------|-----------|---------------|-------------|--------|")
-        for f in info_findings:
-            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.protocols} | {f.source_ranges} | {f.target_tags} | {f.detail} |")
+        p("**Notes:**")
+        p("- Test in staging before modifying production rules")
         p()
 
     p(f"## Per-Project Summary\n")
@@ -137,8 +127,37 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
         p(f"| {r.host_project}{marker} | {vpc_type} | {n_lbs} | {n_fix} | {quota} |")
     p()
 
-    if actionable:
-        p(f"## Remediation\n")
+    if all_lbs:
+        p(f"## External LoadBalancers\n")
+        p(f"These are the LB IPs that will get the new GKE DENY rule at P1000. GKE handles this")
+        p(f"automatically — listed here so you can cross-reference with your custom firewall rules.\n")
+        p(f"| Project | LB IP | Ports | Cluster | Version |")
+        p(f"|---------|-------|-------|---------|---------|")
+        for lb in all_lbs:
+            p(f"| {lb.project} | {lb.ip} | {lb.ports} | {lb.cluster or '-'} | {lb.cluster_version or '-'} |")
+        p()
+
+    p999_findings = [f for f in all_findings if f.category == "Custom P999"]
+    if p999_findings:
+        p(f"## Custom Rules at Priority 999\n")
+        p(f"These rules are not affected by the GKE 1.35.1 change. Listed for awareness as they")
+        p(f"share priority with the new GKE ALLOW rules.\n")
+        p(f"| Project | Rule | Priority | Action | Protocols | Source Ranges | Target Tags | Status |")
+        p(f"|---------|------|----------|--------|-----------|---------------|-------------|--------|")
+        for f in p999_findings:
+            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.rule_action} | {f.protocols} | {f.source_ranges} | {f.target_tags} | {f.detail} |")
+        p()
+
+    # INFO findings for awareness
+    info_findings = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
+    if info_findings:
+        p(f"## Other Custom ALLOW rules at P1000\n")
+        p(f"These rules are not affected by the GKE 1.35.1 change because they don't target GKE node tags.\n")
+        p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags | Status |")
+        p(f"|---------|------|----------|-----------|---------------|-------------|--------|")
+        for f in info_findings:
+            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.protocols} | {f.source_ranges} | {f.target_tags} | {f.detail} |")
+        p()
         p("```bash")
         p('RULE="<rule-name>"')
         p('PROJECT="<project>"')
@@ -262,11 +281,11 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     if p999:
         rows = ""
         for f in p999:
-            rows += f"<tr><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
+            rows += f"<tr><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.rule_action}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td><td>{f.detail}</td></tr>\n"
         p999_section = f"""
         <details><summary>Custom Rules at Priority 999 ({len(p999)} rule(s)) — not affected, listed for awareness</summary>
         <table>
-          <thead><tr><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
+          <thead><tr><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Action</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th><th>Status</th></tr></thead>
           <tbody>{rows}</tbody>
         </table></details>"""
     else:
@@ -442,17 +461,17 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
 
   {result_banner}
 
-  {external_lbs_section}
-
   {scenario_a_section}
 
   {scenario_b_section}
 
-  {p999_section}
+  {remediation_section}
 
   {project_summary_section}
 
-  {remediation_section}
+  {external_lbs_section}
+
+  {p999_section}
 
   {errors_section}
 
