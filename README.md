@@ -115,8 +115,3 @@ Scan Phase (parallel per target)
 Report Phase
 └── Consolidated HTML/MD report with all findings
 ```
-
-## No-dependency Alternative
-
-If you can't install pip packages, the script can also work with subprocess calls to `gcloud` CLI.
-See the `gke-firewall-discovery.py` subprocess version in the project's development history.
