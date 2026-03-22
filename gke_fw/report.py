@@ -68,6 +68,8 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
 
     if all_lbs:
         p(f"## External LoadBalancers\n")
+        p(f"These are the LB IPs that will get the new GKE DENY rule at P1000. GKE handles this")
+        p(f"automatically — listed here so you can cross-reference with your custom firewall rules.\n")
         p(f"| Project | LB IP | Ports | Cluster | Version |")
         p(f"|---------|-------|-------|---------|---------|")
         for lb in all_lbs:
@@ -194,12 +196,13 @@ def generate_html_report(results: list[ProjectResult]) -> str:
         for lb in all_lbs:
             rows += f"<tr><td>{lb.project}</td><td><code>{lb.ip}</code></td><td>{lb.ports}</td><td>{lb.cluster or '-'}</td><td>{lb.cluster_version or '-'}</td></tr>\n"
         external_lbs_section = f"""
-        <h2>External LoadBalancers</h2>
+        <details><summary>External LoadBalancers ({len(all_lbs)}) — LB IPs that will get the new GKE DENY rule</summary>
+        <p>GKE handles this automatically. Listed here so you can cross-reference with your custom firewall rules.</p>
         <div class="filter-bar"><input type="text" placeholder="Filter..."></div>
         <table>
           <thead><tr><th data-sort>Project <span class="sort-arrow">↕</span></th><th data-sort>LB IP</th><th data-sort>Ports</th><th data-sort>Cluster</th><th data-sort>Version</th></tr></thead>
           <tbody>{rows}</tbody>
-        </table>"""
+        </table></details>"""
     else:
         external_lbs_section = ""
 
