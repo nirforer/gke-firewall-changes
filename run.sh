@@ -9,6 +9,98 @@
 
 set -o pipefail
 
+# ============================================================
+# Interactive picker — arrow keys + enter
+# ============================================================
+pick_one() {
+  # Usage: pick_one "prompt" "option1" "option2" ...
+  # Returns the selected option text to stdout
+  local prompt="$1"
+  shift
+  local options=("$@")
+  local selected=0
+  local count=${#options[@]}
+
+  # Hide cursor
+  tput civis 2>/dev/null
+
+  # Print prompt
+  echo "$prompt"
+  echo ""
+
+  # Draw options
+  _draw_menu() {
+    for i in "${!options[@]}"; do
+      tput el 2>/dev/null  # clear line
+      if [ $i -eq $selected ]; then
+        echo -e "  \033[1;36m❯ ${options[$i]}\033[0m"
+      else
+        echo -e "    ${options[$i]}"
+      fi
+    done
+  }
+
+  _draw_menu
+
+  # Read keys
+  while true; do
+    read -rsn1 key
+    case "$key" in
+      $'\x1b')  # escape sequence
+        read -rsn2 rest
+        case "$rest" in
+          '[A') # up
+            ((selected > 0)) && ((selected--))
+            ;;
+          '[B') # down
+            ((selected < count - 1)) && ((selected++))
+            ;;
+        esac
+        ;;
+      '')  # enter
+        break
+        ;;
+    esac
+    # Move cursor up to redraw
+    tput cuu $count 2>/dev/null
+    _draw_menu
+  done
+
+  # Show cursor
+  tput cnorm 2>/dev/null
+  echo ""
+
+  # Return selected option
+  echo "${options[$selected]}"
+}
+
+pick_from_list() {
+  # Usage: pick_from_list "prompt" < <(command that outputs lines)
+  # Reads lines from stdin into an array, shows interactive picker
+  local prompt="$1"
+  local items=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && items+=("$line")
+  done
+
+  if [ ${#items[@]} -eq 0 ]; then
+    echo ""
+    return
+  fi
+
+  if [ ${#items[@]} -eq 1 ]; then
+    echo "  Auto-selected: ${items[0]}"  >&2
+    echo "${items[0]}"
+    return
+  fi
+
+  pick_one "$prompt" "${items[@]}"
+}
+
+# ============================================================
+# Main
+# ============================================================
+
 echo ""
 echo "============================================"
 echo "  GKE 1.35.1 Firewall Change Discovery"
@@ -33,47 +125,82 @@ if ! gcloud auth print-access-token &>/dev/null; then
   echo ""
 fi
 
-# Prompt for scan scope
+# Step 1: Pick scan scope
 echo ""
-echo "How would you like to scan?"
-echo ""
-echo "  1) Specific project (fastest)"
-echo "  2) Shared VPC host project (auto-discovers service projects)"
-echo "  3) Folder (scans all projects in a folder)"
-echo "  4) Organization (scans all projects in an org)"
-echo "  5) Custom (enter your own flags)"
-echo ""
-read -p "Choice [1-5]: " CHOICE
+SCOPE=$(pick_one "How would you like to scan?" \
+  "Project (fastest — scan a single project)" \
+  "Host project (shared VPC — auto-discovers service projects)" \
+  "Folder (scan all projects in a folder)" \
+  "Organization (scan all projects in an org)" \
+  "Custom flags")
 
 EXTRA_FLAGS=""
 
-case "$CHOICE" in
-  1)
-    read -p "Project ID: " PROJECT_ID
-    EXTRA_FLAGS="--project=${PROJECT_ID}"
+case "$SCOPE" in
+  Project*)
+    echo "Loading your projects..."
+    PROJECTS=$(gcloud projects list --format="value(projectId)" --limit=50 --sort-by=projectId 2>/dev/null)
+    SELECTED=$(pick_from_list "Select a project:" <<< "$PROJECTS")
+    if [ -z "$SELECTED" ]; then
+      echo "No projects found."
+      exit 1
+    fi
+    EXTRA_FLAGS="--project=${SELECTED}"
     ;;
-  2)
-    read -p "Host project ID: " HOST_PROJECT
-    EXTRA_FLAGS="--host-project=${HOST_PROJECT}"
+
+  Host*)
+    echo "Loading your projects..."
+    PROJECTS=$(gcloud projects list --format="value(projectId)" --limit=50 --sort-by=projectId 2>/dev/null)
+    SELECTED=$(pick_from_list "Select the shared VPC host project:" <<< "$PROJECTS")
+    if [ -z "$SELECTED" ]; then
+      echo "No projects found."
+      exit 1
+    fi
+    EXTRA_FLAGS="--host-project=${SELECTED}"
     ;;
-  3)
-    read -p "Folder ID: " FOLDER_ID
-    read -p "Max projects to scan [50]: " LIMIT
-    LIMIT=${LIMIT:-50}
+
+  Folder*)
+    echo "Loading your organizations..."
+    ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
+      echo "${id}  ${name}"
+    done)
+    ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
+    ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+
+    if [ -n "$ORG_ID" ]; then
+      echo "Loading folders in org ${ORG_ID}..."
+      FOLDERS=$(gcloud resource-manager folders list --organization="$ORG_ID" --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
+        echo "${id}  ${name}"
+      done)
+      FOLDER_LINE=$(pick_from_list "Select a folder:" <<< "$FOLDERS")
+      FOLDER_ID=$(echo "$FOLDER_LINE" | awk '{print $1}')
+    fi
+
+    if [ -z "$FOLDER_ID" ]; then
+      read -p "Folder ID: " FOLDER_ID
+    fi
+
+    LIMIT=$(pick_one "Max projects to scan:" "50" "100" "200" "500")
     EXTRA_FLAGS="--folder=${FOLDER_ID} --limit=${LIMIT}"
     ;;
-  4)
-    # List orgs for convenience
-    echo ""
-    echo "Your accessible organizations:"
-    gcloud organizations list --format="table(ID,displayName)" 2>/dev/null
-    echo ""
-    read -p "Organization ID: " ORG_ID
-    read -p "Max projects to scan [50]: " LIMIT
-    LIMIT=${LIMIT:-50}
+
+  Organization*)
+    echo "Loading your organizations..."
+    ORGS=$(gcloud organizations list --format="value(ID,displayName)" 2>/dev/null | while IFS=$'\t' read -r id name; do
+      echo "${id}  ${name}"
+    done)
+    ORG_LINE=$(pick_from_list "Select an organization:" <<< "$ORGS")
+    ORG_ID=$(echo "$ORG_LINE" | awk '{print $1}')
+
+    if [ -z "$ORG_ID" ]; then
+      read -p "Organization ID: " ORG_ID
+    fi
+
+    LIMIT=$(pick_one "Max projects to scan:" "50" "100" "200" "500")
     EXTRA_FLAGS="--org=${ORG_ID} --limit=${LIMIT}"
     ;;
-  5)
+
+  Custom*)
     echo ""
     echo "Available flags:"
     echo "  --project=PROJECT         Scan a specific project"
@@ -84,10 +211,6 @@ case "$CHOICE" in
     echo "  --workers=N               Parallel workers (default: 15)"
     echo ""
     read -p "Enter flags: " EXTRA_FLAGS
-    ;;
-  *)
-    echo "Invalid choice. Exiting."
-    exit 1
     ;;
 esac
 
