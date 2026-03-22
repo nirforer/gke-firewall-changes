@@ -35,7 +35,10 @@ os.environ["GLOG_minloglevel"] = "2"
 from dataclasses import dataclass, field
 from typing import Optional
 
+import subprocess as _subprocess
+
 import google.auth
+import google.auth.credentials
 import google.auth.transport.requests
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import compute_v1
@@ -45,6 +48,31 @@ from google.cloud.resourcemanager_v3 import (
     ProjectsClient,
 )
 from google.api_core.exceptions import PermissionDenied, NotFound, Forbidden
+
+
+class GcloudCredentials(google.auth.credentials.Credentials):
+    """Credentials that use `gcloud auth print-access-token`.
+    Works in Cloud Shell without ADC login."""
+
+    def __init__(self):
+        super().__init__()
+        self.token = None
+        self.expiry = None
+
+    def refresh(self, request):
+        result = _subprocess.run(
+            ["gcloud", "auth", "print-access-token"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            raise google.auth.exceptions.RefreshError(
+                "Failed to get access token. Run: gcloud auth login"
+            )
+        self.token = result.stdout.strip()
+
+    @property
+    def valid(self):
+        return bool(self.token)
 
 
 # ============================================================
@@ -174,7 +202,8 @@ def is_internal_ip(ip: str) -> bool:
 
 class GCPClients:
     """Singleton-ish holder for GCP API clients. Created once to avoid
-    repeated gRPC channel setup (~2-4s per client instantiation)."""
+    repeated gRPC channel setup (~2-4s per client instantiation).
+    Uses gcloud user credentials by default (works in Cloud Shell)."""
     _instance = None
 
     def __new__(cls):
@@ -186,12 +215,21 @@ class GCPClients:
     def __init__(self):
         if self._initialized:
             return
-        self.firewalls = compute_v1.FirewallsClient()
-        self.forwarding_rules = compute_v1.ForwardingRulesClient()
-        self.projects = compute_v1.ProjectsClient()
-        self.gke = container_v1.ClusterManagerClient()
-        self.rm_projects = ProjectsClient()
-        self.rm_folders = FoldersClient()
+        # Try ADC first, fall back to gcloud user credentials
+        try:
+            creds, _ = google.auth.default()
+            creds.refresh(google.auth.transport.requests.Request())
+        except Exception:
+            creds = GcloudCredentials()
+            creds.refresh(None)
+
+        self.firewalls = compute_v1.FirewallsClient(credentials=creds)
+        self.forwarding_rules = compute_v1.ForwardingRulesClient(credentials=creds)
+        self.projects = compute_v1.ProjectsClient(credentials=creds)
+        self.gke = container_v1.ClusterManagerClient(credentials=creds)
+        self.rm_projects = ProjectsClient(credentials=creds)
+        self.rm_folders = FoldersClient(credentials=creds)
+        self._credentials = creds
         self._initialized = True
 
 
@@ -1005,22 +1043,17 @@ def main():
     C = Colors(use_color)
     VERBOSE = args.verbose
 
-    # Auth check
+    # Auth check — initialize clients (tries ADC, falls back to gcloud user creds)
     try:
-        credentials, project = google.auth.default()
-        # Verify credentials actually work (Cloud Shell metadata creds can fail with SDK)
-        credentials.refresh(google.auth.transport.requests.Request())
-        status(f"Authenticated (default project: {project or 'none'})")
-    except DefaultCredentialsError:
-        print("ERROR: No credentials found. Run: gcloud auth application-default login", file=sys.stderr)
-        sys.exit(1)
+        clients = get_clients()
+        account = _subprocess.run(
+            ["gcloud", "config", "get-value", "account"],
+            capture_output=True, text=True, timeout=10,
+        ).stdout.strip()
+        status(f"Authenticated as {account or 'unknown'}")
     except Exception as e:
-        if "email" in str(e) or "metadata" in str(e):
-            print("ERROR: Cloud Shell default credentials don't work with Python SDKs.", file=sys.stderr)
-            print("Run: gcloud auth application-default login --no-launch-browser", file=sys.stderr)
-        else:
-            print(f"ERROR: Auth failed: {e}", file=sys.stderr)
-            print("Run: gcloud auth application-default login", file=sys.stderr)
+        print(f"ERROR: Authentication failed: {e}", file=sys.stderr)
+        print("Run: gcloud auth login", file=sys.stderr)
         sys.exit(1)
 
     # Discovery
