@@ -50,6 +50,11 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     p(f"- **Scenario A**: Custom ALLOW at P1000 may be overridden by the new GKE DENY at P1000.")
     p(f"- **Scenario B**: Custom DENY at P1000 will be bypassed by the new GKE ALLOW at P999.")
     p()
+    p(f"**Severity levels:**")
+    p(f"- **HIGH** — Rule will be directly affected. Action required before GKE 1.35.1 rollout.")
+    p(f"- **MEDIUM** — Rule may conflict with new GKE rules at the same priority. Review recommended.")
+    p(f"- **INFO** — Rule is at P1000 but does not target GKE nodes. No action needed.")
+    p()
     p(f"## Overview\n")
     p(f"| Metric | Count |")
     p(f"|--------|-------|")
@@ -425,6 +430,12 @@ def _html_template(timestamp, total_projects, shared_vpc_count, standalone_count
       </ul>
       <p><strong>Scenario A</strong> &mdash; Custom ALLOW rules at P1000 may be overridden by the new GKE DENY at P1000, blocking traffic they previously permitted.</p>
       <p><strong>Scenario B</strong> &mdash; Custom DENY rules at P1000 (e.g. geo-blocking) will be bypassed by the new GKE ALLOW at P999.</p>
+      <p style="margin-top: 0.8rem;"><strong>Severity levels:</strong></p>
+      <ul style="margin: 0.4rem 0 0.4rem 1.5rem;">
+        <li><span class="badge badge-high">HIGH</span> &mdash; Rule will be directly affected. Action required before GKE 1.35.1 rollout.</li>
+        <li><span class="badge badge-medium">MEDIUM</span> &mdash; Rule may conflict with new GKE rules at the same priority. Review recommended.</li>
+        <li><span class="badge badge-info">INFO</span> &mdash; Rule is at P1000 but does not target GKE nodes. No action needed.</li>
+      </ul>
       <p style="margin-top: 0.5rem; color: #8b949e; font-size: 0.85rem;">Source: Google Cloud Support notification, reference issue 493570689.</p>
     </div>
   </details>
