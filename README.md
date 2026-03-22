@@ -12,13 +12,13 @@ Scans your GCP projects to assess the impact of the [GKE 1.35.1 firewall rule ch
 
 ## Quick Start (Cloud Shell)
 
-[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/nirforer/gke-firewall-changes.git&cloudshell_workspace=gke-firewall-discovery-api&cloudshell_open_in_editor=README.md&shellonly=true&cloudshell_tutorial=tutorial.md)
+[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/nirforer/gke-firewall-changes.git&cloudshell_open_in_editor=README.md&shellonly=true&cloudshell_tutorial=tutorial.md)
 
 Or manually in Cloud Shell:
 
 ```bash
 git clone https://github.com/nirforer/gke-firewall-changes.git
-cd gke-firewall-discovery-api
+cd gke-firewall-changes
 bash run.sh
 ```
 
@@ -116,12 +116,7 @@ Report Phase
 └── Consolidated HTML/MD report with all findings
 ```
 
-## No-dependency Version
+## No-dependency Alternative
 
-If you can't install pip packages, use the subprocess version in the parent directory:
-
-```bash
-python3 ../gke-firewall-discovery.py --host-project=my-project --output=report.md
-```
-
-This version only requires `python3` and `gcloud` CLI (no pip install needed).
+If you can't install pip packages, the script can also work with subprocess calls to `gcloud` CLI.
+See the `gke-firewall-discovery.py` subprocess version in the project's development history.
