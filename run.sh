@@ -144,7 +144,7 @@ EXTRA_FLAGS=""
 case "$SCOPE" in
   Project*)
     echo "Loading your projects..."
-    PROJECTS=$(gcloud projects list --format="value(projectId)" --limit=50 --sort-by=projectId 2>/dev/null)
+    PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
     SELECTED=$(pick_from_list "Select a project:" <<< "$PROJECTS")
     if [ -z "$SELECTED" ]; then
       echo "No projects found."
@@ -155,7 +155,7 @@ case "$SCOPE" in
 
   Host*)
     echo "Loading your projects..."
-    PROJECTS=$(gcloud projects list --format="value(projectId)" --limit=50 --sort-by=projectId 2>/dev/null)
+    PROJECTS=$(gcloud projects list --format="value(projectId)" --sort-by=projectId 2>/dev/null)
     SELECTED=$(pick_from_list "Select the shared VPC host project:" <<< "$PROJECTS")
     if [ -z "$SELECTED" ]; then
       echo "No projects found."
@@ -185,7 +185,7 @@ case "$SCOPE" in
       read -p "Folder ID: " FOLDER_ID
     fi
 
-    EXTRA_FLAGS="--folder=${FOLDER_ID} --limit=10000"
+    EXTRA_FLAGS="--folder=${FOLDER_ID}"
     ;;
 
   Organization*)
@@ -200,7 +200,7 @@ case "$SCOPE" in
       read -p "Organization ID: " ORG_ID
     fi
 
-    EXTRA_FLAGS="--org=${ORG_ID} --limit=10000"
+    EXTRA_FLAGS="--org=${ORG_ID}"
     ;;
 
   Custom*)
@@ -210,7 +210,6 @@ case "$SCOPE" in
     echo "  --host-project=PROJECT    Scan a shared VPC host project"
     echo "  --folder=FOLDER_ID        Scan all projects in a folder"
     echo "  --org=ORG_ID              Scan all projects in an org"
-    echo "  --limit=N                 Max projects to scan (default: 50)"
     echo "  --workers=N               Parallel workers (default: 15)"
     echo ""
     read -p "Enter flags: " EXTRA_FLAGS

@@ -144,14 +144,10 @@ def get_service_projects_api(host_project: str) -> list[str]:
         return []
 
 
-def list_projects_in_folder_api(folder_id: str, limit: int) -> list[str]:
+def list_projects_in_folder_api(folder_id: str) -> list[str]:
     try:
-        projects = []
-        for p in get_clients().rm_projects.list_projects(parent=f"folders/{folder_id}"):
-            projects.append(p.project_id)
-            if len(projects) >= limit:
-                break
-        return projects
+        return [p.project_id
+                for p in get_clients().rm_projects.list_projects(parent=f"folders/{folder_id}")]
     except (PermissionDenied, NotFound, Forbidden):
         return []
 
@@ -164,14 +160,12 @@ def list_folders_in_org_api(org_id: str) -> list[str]:
         return []
 
 
-def list_projects_in_org_api(org_id: str, limit: int) -> list[str]:
+def list_projects_in_org_api(org_id: str) -> list[str]:
     from .output import status
     projects = []
     try:
         for p in get_clients().rm_projects.list_projects(parent=f"organizations/{org_id}"):
             projects.append(p.project_id)
-            if len(projects) >= limit:
-                return projects
     except (PermissionDenied, NotFound, Forbidden):
         pass
 
@@ -179,11 +173,9 @@ def list_projects_in_org_api(org_id: str, limit: int) -> list[str]:
     if folders:
         status(f"Found {len(folders)} folder(s) in org. Listing projects...")
     for fid in folders:
-        if len(projects) >= limit:
-            break
-        projects.extend(list_projects_in_folder_api(fid, limit - len(projects)))
+        projects.extend(list_projects_in_folder_api(fid))
 
-    return projects[:limit]
+    return projects
 
 
 def classify_and_check_gke(project_id: str) -> tuple[str, str, bool]:

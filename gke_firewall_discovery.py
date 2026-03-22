@@ -12,7 +12,7 @@ Usage:
   python gke_firewall_discovery.py --host-project=PROJECT
   python gke_firewall_discovery.py --project=PROJECT
   python gke_firewall_discovery.py --folder=FOLDER_ID
-  python gke_firewall_discovery.py --org=ORG_ID --limit=100
+  python gke_firewall_discovery.py --org=ORG_ID
   python gke_firewall_discovery.py --output=report.html
 
 Prerequisites:
@@ -49,8 +49,7 @@ def main():
     parser.add_argument("--folder", default="", help="Scan projects in this folder")
     parser.add_argument("--host-project", action="append", default=[], help="Shared VPC host (repeatable)")
     parser.add_argument("--project", action="append", default=[], help="Standalone project (repeatable)")
-    parser.add_argument("--all-projects", action="store_true", help="Scan accessible projects up to --limit")
-    parser.add_argument("--limit", type=int, default=50, help="Max projects in discovery mode (default: 50)")
+    parser.add_argument("--all-projects", action="store_true", help="Scan all accessible projects")
     parser.add_argument("--workers", type=int, default=15, help="Parallel workers (default: 15)")
     parser.add_argument("--output", default="", help="Write report to file (.md or .html)")
     parser.add_argument("--serve", action="store_true", help="Serve HTML report on port 8080 (for Cloud Shell Web Preview)")

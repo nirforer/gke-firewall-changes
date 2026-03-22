@@ -48,17 +48,13 @@ def discover_targets(args, workers: int) -> list[ScanTarget]:
 
     # Auto-discovery
     if args.org:
-        all_projs = list_projects_in_org_api(args.org, args.limit)
+        all_projs = list_projects_in_org_api(args.org)
     elif args.folder:
-        all_projs = list_projects_in_folder_api(args.folder, args.limit)
+        all_projs = list_projects_in_folder_api(args.folder)
     else:
         status("Listing accessible projects...")
         try:
-            all_projs = []
-            for p in get_clients().rm_projects.search_projects():
-                all_projs.append(p.project_id)
-                if len(all_projs) >= args.limit:
-                    break
+            all_projs = [p.project_id for p in get_clients().rm_projects.search_projects()]
         except Exception:
             all_projs = []
 
@@ -106,8 +102,5 @@ def discover_targets(args, workers: int) -> list[ScanTarget]:
         if cls == "STANDALONE" and has_gke and proj not in seen_hosts and proj not in seen_service:
             status(f"  Standalone: {proj}")
             targets.append(ScanTarget(host_project=proj, service_projects=[proj], is_shared_vpc=False))
-
-    if len(all_projs) >= args.limit:
-        progress_error(f"Reached limit ({args.limit}). Increase with --limit=N.")
 
     return targets
