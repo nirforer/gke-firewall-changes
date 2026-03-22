@@ -143,7 +143,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 priority=r.priority, direction=r.direction,
                 rule_action="ALLOW", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
-                target_tags="(none)",
+                target_tags="All instances",
                 action="Move to P998.",
             ))
         elif r.is_allow and _has_gke_node_tag(r.target_tags, all_node_tags):
@@ -186,7 +186,7 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 priority=r.priority, direction=r.direction,
                 rule_action="DENY", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
-                target_tags=",".join(r.target_tags) or "(none)",
+                target_tags=",".join(r.target_tags) or "All instances",
                 action="Move to P999 or lower.",
             ))
 
