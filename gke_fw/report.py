@@ -101,13 +101,11 @@ def print_report(results: list[ProjectResult], out=None, colors: Colors = None):
     # INFO findings for awareness
     info_findings = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
     if info_findings:
-        p(f"### Low Risk — Custom ALLOW rules at P1000 with non-GKE tags\n")
-        p(f"These rules have target tags that don't match GKE nodes. Unlikely to be affected,")
-        p(f"but review if any tags overlap with GKE node targets.\n")
-        p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags |")
-        p(f"|---------|------|----------|-----------|---------------|-------------|")
+        p(f"### Other Custom ALLOW rules at P1000\n")
+        p(f"| Project | Rule | Priority | Protocols | Source Ranges | Target Tags | Status |")
+        p(f"|---------|------|----------|-----------|---------------|-------------|--------|")
         for f in info_findings:
-            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.protocols} | {f.source_ranges} | {f.target_tags} |")
+            p(f"| {f.project} | `{f.rule_name}` | {f.priority} | {f.protocols} | {f.source_ranges} | {f.target_tags} | {f.detail} |")
         p()
 
     p(f"## Per-Project Summary\n")
@@ -214,17 +212,16 @@ def generate_html_report(results: list[ProjectResult]) -> str:
     else:
         scenario_a_section = ""
 
-    # Scenario A — INFO (non-GKE tags)
+    # Scenario A — INFO (non-GKE tags or unverified)
     info_a = [f for f in all_findings if f.severity == "INFO" and f.category == "Scenario A"]
     if info_a:
         rows = ""
         for f in info_a:
-            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td></tr>\n"
+            rows += f"<tr><td>{badge(f.severity)}</td><td>{f.project}</td><td><code>{f.rule_name}</code></td><td>{f.priority}</td><td>{f.protocols}</td><td>{f.source_ranges}</td><td>{f.target_tags}</td><td>{f.detail}</td></tr>\n"
         scenario_a_section += f"""
-        <details><summary>Low Risk — ALLOW at P1000 with non-GKE tags ({len(info_a)} rule(s))</summary>
-        <p>These rules have target tags that don't match GKE nodes. Review if any tags overlap with GKE node targets.</p>
+        <details><summary>Other ALLOW at P1000 ({len(info_a)} rule(s))</summary>
         <table>
-          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th></tr></thead>
+          <thead><tr><th>Severity</th><th data-sort>Project</th><th data-sort>Rule</th><th data-sort>Priority</th><th data-sort>Protocols</th><th data-sort>Source Ranges</th><th data-sort>Target Tags</th><th>Status</th></tr></thead>
           <tbody>{rows}</tbody>
         </table></details>"""
 

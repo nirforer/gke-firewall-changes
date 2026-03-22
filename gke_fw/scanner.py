@@ -159,7 +159,15 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 action="Move to P998.",
             ))
         elif r.is_allow:
-            # Scenario A — INFO: tags don't match any known GKE node tags
+            if all_node_tags:
+                # We have real node tags — this rule doesn't target GKE nodes
+                detail = "does not target GKE nodes"
+                action = "No action needed."
+            else:
+                # No node tags discovered (GKE API permission denied?) —
+                # can't confirm whether these tags match GKE nodes or not
+                detail = "could not verify against GKE node tags"
+                action = "Verify manually — GKE node tags could not be read."
             result.conflicting_rules.append(Finding(
                 project=hp, vpc_type=vpc_type, severity="INFO",
                 category="Scenario A", rule_name=r.name,
@@ -167,8 +175,8 @@ def scan_target(target: ScanTarget, workers: int) -> ProjectResult:
                 rule_action="ALLOW", protocols=r.action_str,
                 source_ranges=",".join(r.source_ranges),
                 target_tags=",".join(r.target_tags),
-                detail="tags don't match GKE nodes",
-                action="Review if tags overlap with GKE node targets.",
+                detail=detail,
+                action=action,
             ))
         elif r.is_deny:
             # Scenario B — HIGH: new GKE ALLOW at P999 will bypass this DENY
